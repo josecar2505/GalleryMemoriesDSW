@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "471335347070",
+    "project_id": "gallerymemories-dsw",
+    "storage_bucket": "gallerymemories-dsw.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:471335347070:android:88245046ea8edd5e05c92f",
+        "android_client_info": {
+          "package_name": "mx.edu.ittepic.gallery_memories"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0m0S6aGr5YxUyjqKysTqxLymSZvJHbBs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
