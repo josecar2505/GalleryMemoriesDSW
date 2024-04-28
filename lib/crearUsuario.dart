@@ -37,11 +37,13 @@ class _crearusuarioState extends State<crearusuario> {
         'email': email,
         'amigos':amigos,
       };
-      DB.creaUsuario(usuario);
+      // Llama a la función creaUsuario y espera a que se complete
+      String idUsuario = await DB.creaUsuario(usuario);
+
       // Muestra un SnackBar con el correo del usuario registrado
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Usuario registrado: ${userCredential.user!.email}"),
+          content: Text("Usuario registrado con ID: $idUsuario"),
         ),
       );
 

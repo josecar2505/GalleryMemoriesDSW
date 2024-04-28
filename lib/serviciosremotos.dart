@@ -20,8 +20,16 @@ class DB{
   }
 
   static Future<String> creaUsuario(Map<String, dynamic> usuario) async {
-    DocumentReference eventoRef = await baseremota.collection("usuarios").add(usuario);
-    return eventoRef.id;
+    String idUsuario = usuario['idUsuario']; // Obtener el ID del usuario
+
+    // Crear una referencia al documento con el ID del usuario
+    DocumentReference usuarioRef = baseremota.collection("usuarios").doc(idUsuario);
+
+    // Establecer los datos del usuario en el documento con el ID especificado
+    await usuarioRef.set(usuario);
+
+    // Devolver el ID del usuario como confirmación
+    return idUsuario;
   }
 
   static creaEvento(Map<String, dynamic> evento) async {
@@ -29,20 +37,93 @@ class DB{
     return eventoRef.id;
   }
 
-  static Future<List> obtenerEventos(String uid) async{
-    List temp = [];
+  static Future<List<Map<String, dynamic>>> obtenerEventos(String uid) async {
+    List<Map<String, dynamic>> temp = [];
     var query = await baseremota.collection("eventos").where('propietario', isEqualTo: uid).get();
 
-    query.docs.forEach((element) {
+    for (var element in query.docs) {
       Map<String, dynamic> dato = element.data();
-      dato.addAll({
-        'id': element.id
-      });
+      dato['id'] = element.id;
+
+      var documentoUsuario = await baseremota.collection("usuarios").doc(dato['propietario']).get();
+      // Si encuentra la colección del ID del usuario, sustituye el campo 'propietario' por el nombre del usuario
+      if (documentoUsuario.exists) {
+        var nombrePropietario = documentoUsuario.data()?['nombre'];
+        dato['propietario'] = nombrePropietario;
+      } else {
+        print("No se encontró ningún documento de usuario con el ID ${dato['propietario']}");
+      }
 
       temp.add(dato);
-    });
+    }
 
     return temp;
+  }
+
+  static Future<List> buscarInvitacion(String idinvitacion) async {
+    List temp = [];
+
+    try {
+      var documento = await baseremota.collection("eventos").doc(idinvitacion).get();
+
+      if (documento.exists) {
+        // El documento existe, puedes acceder a sus datos
+        var datos = documento.data();  //Datos de la colección "eventos"
+
+        //Obtener ID del propietario
+        var idPropietario = datos?['propietario'];
+
+        //Obtener el nombre del usuario con el idPropietario
+        var documentoUsuario = await baseremota.collection("usuarios").doc(idPropietario).get();
+
+        //Si encuentra la colección del el ID del usuario, sustituye el campo propietario por el nombre del usuario
+        if(documentoUsuario.exists){
+          var nombrePropietario = documentoUsuario.data()?['nombre'];
+          datos?['propietario'] = nombrePropietario;
+        }else{
+          print("No se encontró ningún documento de usuario con el ID $idPropietario");
+        }
+        print("Datos del documento con ID $idinvitacion: $datos");
+
+        temp.add(datos);
+      } else {
+        // El documento no existe
+        print("No se encontró ningún documento con el ID $idinvitacion");
+      }
+    } catch (e) {
+      // Manejar el error según sea necesario
+      print("Error al obtener el documento: $e");
+    }
+
+    return temp;
+  }
+
+  static Future agregarInvitado(String id, String uid) async {
+    try {
+      // Referencia al documento en la colección "eventos"
+      var referenciaEvento = await baseremota.collection("eventos").doc(id).get().then((value) {
+        if (value.exists) {
+          // Verificar si el documento existe antes de acceder a sus datos
+          Map<String, dynamic>? mapa = value.data();
+
+          if (mapa != null && mapa.isNotEmpty) {
+            List<dynamic> idInvitado = mapa['invitados'] ?? [];
+            idInvitado.add(uid);
+
+            baseremota.collection("eventos").doc(id).update({'invitados': idInvitado});
+          } else {
+            print("El documento está vacío o no contiene datos.");
+          }
+        } else {
+          print("El documento con ID $id no existe.");
+        }
+      });
+
+      print("Invitado agregado con éxito al evento con ID $id");
+    } catch (e) {
+      // Manejar el error según sea necesario
+      print("Error al agregar invitado: $e");
+    }
   }
 }
 
@@ -67,4 +148,21 @@ class Storage {
       return "Nohay";
     }
   }
+
+  static Future subirFoto(String path, String nombreImagen, String nombreCarpeta) async {
+    var file = File(path);
+
+    return await carpetaRemota.ref("$nombreCarpeta/$nombreImagen").putFile(file);
+  }
+
+  static Future<String> obtenerURLimagen(String nombreCarpeta,String nombre)async{
+    return await carpetaRemota.ref("$nombreCarpeta/$nombre").getDownloadURL();
+  }
+
+
+  static Future<ListResult>  obtenerFotos(nombreCarpeta) async{
+      String carpeta = nombreCarpeta;
+      return await carpetaRemota.ref(carpeta).listAll();
+  }
+
 }

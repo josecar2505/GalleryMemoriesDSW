@@ -27,7 +27,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "mx.edu.ittepic.gallery_memories"
-    compileSdkVersion flutter.compileSdkVersion
+    compileSdkVersion 34
     ndkVersion flutter.ndkVersion
 
     compileOptions {

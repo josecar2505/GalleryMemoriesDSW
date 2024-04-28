@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:gallery_memories/login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gallery_memories/serviciosremotos.dart';
-
+import 'package:gallery_memories/evento.dart';
 class inicioApp extends StatefulWidget {
   const inicioApp({super.key});
 
@@ -13,7 +13,7 @@ class inicioApp extends StatefulWidget {
 
 class _inicioAppState extends State<inicioApp> {
   String abreviatura = "U", nombre_usuario = "User", uid = "";
-  int _index = 0;
+  int _index = 0; //Para la navegación con el drawer
   List eventos = [
     "Bautizo",
     "Fiesta de cumpleaños",
@@ -24,19 +24,18 @@ class _inicioAppState extends State<inicioApp> {
     "Reunión"
   ];
   String eventoSeleccionado = "";
-  String msjBuscar = "";
 
+  //Controllers para crear un evento
   final nombre = TextEditingController();
   final tipoEvento = TextEditingController();
   final fechaEvento = TextEditingController();
   final horaEvento = TextEditingController();
   final numInvitacion = TextEditingController();
 
-  String propietario = "";
-  String des = "";
-  String fini = "";
-  String ffin = "";
-  String tevento = "";
+
+  //Variables para consultar un evento como invitado
+  String auxProp = "", auxFecha= "", auxHora = "", auxNombre = "", auxTipo = "";
+
 
   @override
   void setUser() async {
@@ -212,6 +211,21 @@ class _inicioAppState extends State<inicioApp> {
                           ),
                           child: InkWell(
                             onTap: () {
+                              //ABRIR VENTANA PARA MOSTRAR LOS DATOS DEL EVENTO
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => eventoIndividual(
+                                    nombre: listaJSON.data?[indice]['nombre'] ?? '',
+                                    tipoEvento: listaJSON.data?[indice]['tipoEvento'] ?? '',
+                                    propietario: listaJSON.data?[indice]['propietario'] ?? '',
+                                    idEvento: listaJSON.data?[indice]['id'] ?? '',
+                                    isMine: listaJSON.data?[indice]['propietario'] == uid,
+                                    fechaEvento: listaJSON.data?[indice]['fechaEvento'] ?? '',
+                                    horaEvento: listaJSON.data?[indice]['horaEvento'] ?? '',
+                                  ),
+                                ),
+                              );
                             },
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -248,18 +262,34 @@ class _inicioAppState extends State<inicioApp> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
+                                          //BOTON PARA COPIAR CÓDIGO DE INVITACIÓN
                                           IconButton(
                                               onPressed: (){
+                                                // Copia el código de invitación al portapapeles
+                                                Clipboard.setData(
+                                                  ClipboardData(
+                                                    text: "${listaJSON.data?[indice]['id']}",
+                                                  ),
+                                                );
+
+                                                // Muestra un mensaje emergente para informar al usuario que el código ha sido copiado
+                                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Código de invitación copiado al portapapeles."),),);
                                               },
                                               icon: Icon(Icons.copy, color: Colors.black87,)
                                           ),
+                                          //BOTÓN PARA ELIMINAR EL EVENTO
                                           SizedBox(width: 20,),
                                           IconButton(
                                               onPressed: (){},
                                               icon: Icon(Icons.close, color: Colors.red,)
                                           ),
+                                          SizedBox(width: 20,),
+                                          //BOTÓN PARA COMPARTIR EL EVENTO
                                           IconButton(
-                                              onPressed: (){},
+                                              onPressed: (){
+                                                //Buscar COMPONENTE PARA ENVIAR MSJ POR WHATSAPP
+                                                //compartirTexto("Hola! Me gustaría que te unieras a mi album en Gallery Memories. Ingresa el código ${listaJSON.data?[indice]['id']} en Agregar Evento");
+                                              },
                                               icon: Icon(Icons.share, color: Colors.blueGrey,)
                                           ),
                                         ],
@@ -285,12 +315,96 @@ class _inicioAppState extends State<inicioApp> {
   }
 
   Widget invitaciones(){
-    return Center(child: Text("PESTAÑA MIS INVITACIONES"),);
+    return Center(child: Text("PESTAÑeeA MIS INVITACIONES"),);
   }
 
   Widget agregarEvento(){
-    return Center(child: Text("PESTAÑA AGREGAR EVENTO"),);
+    return ListView(
+      padding: EdgeInsets.all(40),
+      children: [
+        Center(
+          child: Text(
+            "AGREGAR EVENTO",
+            style: TextStyle(
+              fontSize: 25,
+              color: Colors.red,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        SizedBox(height: 20),
+        TextField(
+          controller: numInvitacion,
+          decoration: InputDecoration(
+            labelText: "NUMERO DE INVITACION:",
+            border: OutlineInputBorder(),
+            floatingLabelBehavior: FloatingLabelBehavior.always,
+            suffixIcon: Icon(Icons.event),
+          ),
+        ),
+        SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: () async {
+            try {
+              List<dynamic> jsonTemporal = await DB.buscarInvitacion(numInvitacion.text);
 
+              setState(() {
+                auxProp = "Realizado por: ${jsonTemporal[0]['propietario']}";
+                auxNombre = "Nimbre: ${jsonTemporal[0]['nombre']}";
+                auxFecha = "Fecha: ${jsonTemporal[0]['fechaEvento']}";
+                auxHora = "Hora: ${jsonTemporal[0]['horaEvento']}";
+                auxTipo = "Tipo de evento: ${jsonTemporal[0]['tipoEvento']}";
+              });
+            } catch (error) {
+              print("Error al buscar invitación: $error");
+              // Puedes mostrar un mensaje de error al usuario si es necesario
+            }
+          },
+          child: Text("BUSCAR"),
+        ),
+        SizedBox(height: 20),
+        Container(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("${auxProp}", style: TextStyle(fontFamily: 'Oswald', fontSize: 17)),
+              SizedBox(height: 8.0),
+              Text("$auxNombre", style: TextStyle(fontFamily: 'Oswald', fontSize: 17)),
+              SizedBox(height: 8.0),
+              Text("$auxFecha", style: TextStyle(fontFamily: 'Oswald', fontSize: 17)),
+              SizedBox(height: 8.0),
+              Text("$auxHora", style: TextStyle(fontFamily: 'Oswald', fontSize: 17)),
+              SizedBox(height: 8.0),
+              Text("$auxTipo", style: TextStyle(fontFamily: 'Oswald', fontSize: 17)),
+            ],
+          ),
+        ),
+        ElevatedButton(
+          onPressed: ()  {
+            try {
+              DB.agregarInvitado(numInvitacion.text, uid).then((value) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Evento agregado")));
+                setState(() {
+                  numInvitacion.text = "";
+                  auxProp = "";
+                  auxFecha= "";
+                  auxHora = "";
+                  auxNombre = "";
+                  auxTipo = "";
+                  _index = 1;
+                });
+              });
+
+            } catch (error) {
+              print("Error al agregar invitado: $error");
+              // Puedes mostrar un mensaje de error al usuario si es necesario
+            }
+          },
+          child: Text("AGREGAR"),
+        ),
+      ],
+    );
   }
 
   Widget crearEvento(){
@@ -476,4 +590,20 @@ class _inicioAppState extends State<inicioApp> {
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
   }
 
+/*
+  void compartirTexto(String texto) async {
+    final whatsappUrl = 'whatsapp://send?text=$texto';
+    final messengerUrl = 'fb-messenger://share/?link=$texto';
+    final otherUrl = 'sms:?body=$texto';
+
+    // Intenta abrir WhatsApp
+    if (await canLaunch(whatsappUrl)) {
+      await launch(whatsappUrl);
+    } else if (await canLaunch(messengerUrl)) { // Si WhatsApp no está disponible, intenta abrir Facebook Messenger
+      await launch(messengerUrl);
+    } else { // Si ninguna de las aplicaciones está disponible, abre la aplicación de mensajes predeterminada
+      await launch(otherUrl);
+    }
+  }
+  */
 }
