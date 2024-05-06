@@ -98,33 +98,105 @@ class DB{
     return temp;
   }
 
-  static Future agregarInvitado(String id, String uid) async {
+  static Future<bool> agregarInvitado(String idEvento, String uid) async {
     try {
       // Referencia al documento en la colección "eventos"
-      var referenciaEvento = await baseremota.collection("eventos").doc(id).get().then((value) {
-        if (value.exists) {
-          // Verificar si el documento existe antes de acceder a sus datos
-          Map<String, dynamic>? mapa = value.data();
+      var eventoSnapshot = await baseremota.collection("eventos").doc(idEvento).get();
 
-          if (mapa != null && mapa.isNotEmpty) {
-            List<dynamic> idInvitado = mapa['invitados'] ?? [];
-            idInvitado.add(uid);
+      if (eventoSnapshot.exists) {
+        // Verificar si el documento existe antes de acceder a sus datos
+        Map<String, dynamic>? eventoData = eventoSnapshot.data();
 
-            baseremota.collection("eventos").doc(id).update({'invitados': idInvitado});
+        if (eventoData != null) {
+          String propietarioEvento = eventoData['propietario'];
+
+          if (propietarioEvento == uid) {
+            // Si el usuario es el propietario del evento, no puede registrarse como invitado
+            print("Eres el propietario de este evento, no puedes registrarte como invitado!!!");
+            return false;
+          }
+
+          List<dynamic> invitados = eventoData['invitados'] ?? [];
+          if (!invitados.contains(uid)) {
+            // Si el usuario no está en la lista de invitados, agréguelo
+            invitados.add(uid);
+            await baseremota.collection("eventos").doc(idEvento).update({'invitados': invitados});
+            print("Invitado agregado con éxito al evento con ID $idEvento");
+            return true;
           } else {
-            print("El documento está vacío o no contiene datos.");
+            print("El usuario ya está registrado como invitado en este evento.");
+            return false;
           }
         } else {
-          print("El documento con ID $id no existe.");
+          print("El documento está vacío o no contiene datos.");
+          return false;
         }
-      });
-
-      print("Invitado agregado con éxito al evento con ID $id");
+      } else {
+        print("El documento con ID $idEvento no existe.");
+        return false;
+      }
     } catch (e) {
       // Manejar el error según sea necesario
       print("Error al agregar invitado: $e");
+      return false;
     }
   }
+
+  static Future<List<Map<String, dynamic>>> misInvitaciones(String uid) async{
+    List<Map<String, dynamic>> temp = [];
+    var query = await baseremota.collection("eventos").where('invitados', arrayContains: uid).where('estatus', isEqualTo: true).get();
+
+    for (var element in query.docs) {
+      Map<String, dynamic> dato = element.data();
+      dato['id'] = element.id;
+
+      // Obtener el nombre del propietario del evento
+      var propietarioEvento = dato['propietario'];
+      var documentoUsuario = await baseremota.collection("usuarios").doc(propietarioEvento).get();
+      // Si encuentra el documento del usuario, sustituye el campo 'propietario' por el nombre del usuario
+      if (documentoUsuario.exists) {
+        var nombrePropietario = documentoUsuario.data()?['nombre'];
+        dato['propietario'] = nombrePropietario;
+      } else {
+        print("No se encontró ningún documento de usuario con el ID $propietarioEvento");
+      }
+
+      temp.add(dato);
+    }
+
+    return temp;
+  }
+
+  static Future<Map<String, dynamic>> obtenerDatosEvento(String idEvento) async {
+    try {
+      // Obtener el documento del evento desde Firebase usando el ID del evento
+      var documentoEvento = await baseremota.collection("eventos").doc(idEvento).get();
+      if (documentoEvento.exists) {
+        // Extraer los datos del documento del evento
+        Map<String, dynamic> datosEvento = documentoEvento.data() as Map<String, dynamic>;
+
+        // Obtener el nombre del propietario del evento
+        var documentoUsuario = await baseremota.collection("usuarios").doc(datosEvento['propietario']).get();
+        if (documentoUsuario.exists) {
+          var nombrePropietario = documentoUsuario.data()?['nombre'];
+          datosEvento['propietario'] = nombrePropietario;
+        } else {
+          print("No se encontró ningún documento de usuario con el ID ${datosEvento['propietario']}");
+        }
+
+        // Si es necesario, puedes hacer ajustes adicionales aquí antes de devolver los datos del evento
+
+        return datosEvento;
+      } else {
+        // El evento no fue encontrado en Firebase
+        throw Exception("El evento con el ID $idEvento no fue encontrado en Firebase.");
+      }
+    } catch (error) {
+      // Manejar cualquier error que ocurra durante la obtención de los datos del evento
+      throw Exception("Error al obtener los datos del evento: $error");
+    }
+  }
+
 }
 
 class Storage {
@@ -158,7 +230,6 @@ class Storage {
   static Future<String> obtenerURLimagen(String nombreCarpeta,String nombre)async{
     return await carpetaRemota.ref("$nombreCarpeta/$nombre").getDownloadURL();
   }
-
 
   static Future<ListResult>  obtenerFotos(nombreCarpeta) async{
       String carpeta = nombreCarpeta;

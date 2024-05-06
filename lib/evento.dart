@@ -40,8 +40,8 @@ class _eventoIndividualState extends State<eventoIndividual> {
             _buildEventInfo("Hora", widget.horaEvento),
             // Aquí van las fotos
             Container(
-              height: 450,
-              color: Colors.blueGrey,
+              height: 400,
+              color: Colors.white54,
               child: FutureBuilder(
                 // Obtiene las fotos del evento desde el servicio remoto
                 future: Storage.obtenerFotos(widget.idEvento),

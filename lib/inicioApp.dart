@@ -315,7 +315,116 @@ class _inicioAppState extends State<inicioApp> {
   }
 
   Widget invitaciones(){
-    return Center(child: Text("PESTAÑeeA MIS INVITACIONES"),);
+    return FutureBuilder(
+      future: DB.misInvitaciones(uid),
+      builder: (context, listaJSON) {
+        if (listaJSON.hasData && listaJSON.data != null) {
+          print("Invitaciones encontradas: ${listaJSON.data} para el usuario $uid");
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(height: 30),
+              Text(
+                "MIS INVITACIONES",
+                style: TextStyle(
+                  color: Colors.blue,
+                  fontSize: 40,
+                  fontFamily: 'BebasNeue',
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: listaJSON.data?.length,
+                  itemBuilder: (context, indice) {
+                    return FutureBuilder(
+                      future: Storage.obtenerPrimeraImagenDeAlbum('${listaJSON.data?[indice]['id']}',),
+                      builder: (context, snapshot) {
+                        return Card(
+                          elevation: 5,
+                          margin: EdgeInsets.all(10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => eventoIndividual(
+                                    nombre: listaJSON.data?[indice]['nombre'] ?? '',
+                                    tipoEvento: listaJSON.data?[indice]['tipoEvento'] ?? '',
+                                    propietario: listaJSON.data?[indice]['propietario'] ?? '',
+                                    idEvento: listaJSON.data?[indice]['id'] ?? '',
+                                    isMine: listaJSON.data?[indice]['propietario'] == uid,
+                                    fechaEvento: listaJSON.data?[indice]['fechaEvento'] ?? '',
+                                    horaEvento: listaJSON.data?[indice]['horaEvento'] ?? '',
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Mostrar la primera imagen si está disponible, de lo contrario, mostrar la imagen genérica
+                                ClipRRect(
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: Radius.circular(15),
+                                    topRight: Radius.circular(15),
+                                  ),
+                                  child: Image.network("https://img.freepik.com/vector-premium/icono-galeria-fotos-vectorial_723554-144.jpg?w=2000",
+                                    width: double.infinity,
+                                    height: 150,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(10.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        listaJSON.data?[indice]['nombre'],
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            "${listaJSON.data?[indice]['tipoEvento']}",
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            onPressed: () {
+                                            },
+                                            icon: Icon(Icons.close, color: Colors.red,),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+
+            ],
+          );
+        }
+        return Center(child: CircularProgressIndicator());
+      },
+    );
   }
 
   Widget agregarEvento(){
@@ -336,7 +445,7 @@ class _inicioAppState extends State<inicioApp> {
         TextField(
           controller: numInvitacion,
           decoration: InputDecoration(
-            labelText: "NUMERO DE INVITACION:",
+            labelText: "CÓDIGO DE INVITACION:",
             border: OutlineInputBorder(),
             floatingLabelBehavior: FloatingLabelBehavior.always,
             suffixIcon: Icon(Icons.event),
@@ -347,7 +456,6 @@ class _inicioAppState extends State<inicioApp> {
           onPressed: () async {
             try {
               List<dynamic> jsonTemporal = await DB.buscarInvitacion(numInvitacion.text);
-
               setState(() {
                 auxProp = "Realizado por: ${jsonTemporal[0]['propietario']}";
                 auxNombre = "Nimbre: ${jsonTemporal[0]['nombre']}";
@@ -360,7 +468,7 @@ class _inicioAppState extends State<inicioApp> {
               // Puedes mostrar un mensaje de error al usuario si es necesario
             }
           },
-          child: Text("BUSCAR"),
+          child: Text("CONSULTAR EVENTO"),
         ),
         SizedBox(height: 20),
         Container(
@@ -381,28 +489,54 @@ class _inicioAppState extends State<inicioApp> {
           ),
         ),
         ElevatedButton(
-          onPressed: ()  {
+          onPressed: () async {
             try {
-              DB.agregarInvitado(numInvitacion.text, uid).then((value) {
+              bool invitadoAgregado = await DB.agregarInvitado(numInvitacion.text, uid);
+              if (invitadoAgregado) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Evento agregado")));
                 setState(() {
-                  numInvitacion.text = "";
-                  auxProp = "";
-                  auxFecha= "";
-                  auxHora = "";
-                  auxNombre = "";
-                  auxTipo = "";
                   _index = 1;
                 });
+                // Obtener los datos del evento desde Firebase usando el ID del evento
+                Map<String, dynamic> datosEvento = await DB.obtenerDatosEvento(numInvitacion.text);
+                if (datosEvento != null) {
+                  // Navegar a la ventana eventoIndividual con los datos del evento
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => eventoIndividual(
+                        nombre: datosEvento['nombre'] ?? '',
+                        tipoEvento: datosEvento['tipoEvento'] ?? '',
+                        propietario: datosEvento['propietario'] ?? '',
+                        idEvento: datosEvento['id'] ?? '',
+                        isMine: datosEvento['propietario'] == uid,
+                        fechaEvento: datosEvento['fechaEvento'] ?? '',
+                        horaEvento: datosEvento['horaEvento'] ?? '',
+                      ),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: No se pudieron obtener los datos del evento.")));
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Solo puedes añadirte como invitado a eventos de otros usuarios.")));
+              }
+              setState(() {
+                numInvitacion.text = "";
+                auxProp = "";
+                auxFecha = "";
+                auxHora = "";
+                auxNombre = "";
+                auxTipo = "";
               });
-
             } catch (error) {
               print("Error al agregar invitado: $error");
-              // Puedes mostrar un mensaje de error al usuario si es necesario
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error al agregar invitado. Por favor, inténtalo de nuevo más tarde.")));
             }
           },
-          child: Text("AGREGAR"),
+          child: Text("INGRESAR"),
         ),
+
       ],
     );
   }
@@ -589,21 +723,4 @@ class _inicioAppState extends State<inicioApp> {
     }
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
   }
-
-/*
-  void compartirTexto(String texto) async {
-    final whatsappUrl = 'whatsapp://send?text=$texto';
-    final messengerUrl = 'fb-messenger://share/?link=$texto';
-    final otherUrl = 'sms:?body=$texto';
-
-    // Intenta abrir WhatsApp
-    if (await canLaunch(whatsappUrl)) {
-      await launch(whatsappUrl);
-    } else if (await canLaunch(messengerUrl)) { // Si WhatsApp no está disponible, intenta abrir Facebook Messenger
-      await launch(messengerUrl);
-    } else { // Si ninguna de las aplicaciones está disponible, abre la aplicación de mensajes predeterminada
-      await launch(otherUrl);
-    }
-  }
-  */
 }
