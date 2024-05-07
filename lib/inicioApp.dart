@@ -130,7 +130,6 @@ class _inicioAppState extends State<inicioApp> {
     );
   }
 
-
   Widget _item(IconData icono, String texto, int indice) {
     return ListTile(
       onTap: () {
@@ -203,6 +202,7 @@ class _inicioAppState extends State<inicioApp> {
                     return FutureBuilder(
                       future: Storage.obtenerPrimeraImagenDeAlbum('${listaJSON.data?[indice]['id']}',),
                       builder: (context, snapshot) {
+                        String primeraImagen = snapshot.data ?? '';
                         return Card(
                           elevation: 5,
                           margin: EdgeInsets.all(10),
@@ -210,9 +210,8 @@ class _inicioAppState extends State<inicioApp> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: InkWell(
-                            onTap: () {
-                              //ABRIR VENTANA PARA MOSTRAR LOS DATOS DEL EVENTO
-                              Navigator.push(
+                            onTap: () {//ABRIR VENTANA PARA MOSTRAR LOS DATOS DEL EVENTO
+                            Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => eventoIndividual(
@@ -220,9 +219,10 @@ class _inicioAppState extends State<inicioApp> {
                                     tipoEvento: listaJSON.data?[indice]['tipoEvento'] ?? '',
                                     propietario: listaJSON.data?[indice]['propietario'] ?? '',
                                     idEvento: listaJSON.data?[indice]['id'] ?? '',
-                                    isMine: listaJSON.data?[indice]['propietario'] == uid,
+                                    isMine: true, //Como soy anfitrión, paso el valor directo de TRUE
                                     fechaEvento: listaJSON.data?[indice]['fechaEvento'] ?? '',
                                     horaEvento: listaJSON.data?[indice]['horaEvento'] ?? '',
+                                    idUsuarioActual: uid,
                                   ),
                                 ),
                               );
@@ -235,7 +235,10 @@ class _inicioAppState extends State<inicioApp> {
                                     topLeft: Radius.circular(15),
                                     topRight: Radius.circular(15),
                                   ),
-                                  child: Image.network("https://img.freepik.com/vector-premium/icono-galeria-fotos-vectorial_723554-144.jpg?w=2000",
+                                  child: Image.network(
+                                    primeraImagen.isNotEmpty
+                                        ? primeraImagen
+                                        : "https://img.freepik.com/vector-premium/icono-galeria-fotos-vectorial_723554-144.jpg?w=2000",
                                     width: double.infinity,
                                     height: 130,
                                     fit: BoxFit.cover,
@@ -340,6 +343,7 @@ class _inicioAppState extends State<inicioApp> {
                     return FutureBuilder(
                       future: Storage.obtenerPrimeraImagenDeAlbum('${listaJSON.data?[indice]['id']}',),
                       builder: (context, snapshot) {
+                        String primeraImagen = snapshot.data ?? '';
                         return Card(
                           elevation: 5,
                           margin: EdgeInsets.all(10),
@@ -359,6 +363,7 @@ class _inicioAppState extends State<inicioApp> {
                                     isMine: listaJSON.data?[indice]['propietario'] == uid,
                                     fechaEvento: listaJSON.data?[indice]['fechaEvento'] ?? '',
                                     horaEvento: listaJSON.data?[indice]['horaEvento'] ?? '',
+                                    idUsuarioActual: uid,
                                   ),
                                 ),
                               );
@@ -372,9 +377,12 @@ class _inicioAppState extends State<inicioApp> {
                                     topLeft: Radius.circular(15),
                                     topRight: Radius.circular(15),
                                   ),
-                                  child: Image.network("https://img.freepik.com/vector-premium/icono-galeria-fotos-vectorial_723554-144.jpg?w=2000",
+                                  child: Image.network(
+                                    primeraImagen.isNotEmpty
+                                        ? primeraImagen
+                                        : "https://img.freepik.com/vector-premium/icono-galeria-fotos-vectorial_723554-144.jpg?w=2000",
                                     width: double.infinity,
-                                    height: 150,
+                                    height: 130,
                                     fit: BoxFit.cover,
                                   ),
                                 ),
@@ -418,7 +426,6 @@ class _inicioAppState extends State<inicioApp> {
                   },
                 ),
               ),
-
             ],
           );
         }
@@ -509,9 +516,10 @@ class _inicioAppState extends State<inicioApp> {
                         tipoEvento: datosEvento['tipoEvento'] ?? '',
                         propietario: datosEvento['propietario'] ?? '',
                         idEvento: datosEvento['id'] ?? '',
-                        isMine: datosEvento['propietario'] == uid,
+                        isMine: false, //Como soy invitado paso un FALSE en este campo
                         fechaEvento: datosEvento['fechaEvento'] ?? '',
                         horaEvento: datosEvento['horaEvento'] ?? '',
+                        idUsuarioActual: uid,
                       ),
                     ),
                   );
@@ -624,15 +632,31 @@ class _inicioAppState extends State<inicioApp> {
                   'estatus': true,
                   'invitados': [],
                 };
-
-                DB.creaEvento(jsonTemporal).then((idEvento) {
+                //Crear evento y redireccionar a la ventana del evento creado
+                DB.creaEvento(jsonTemporal).then((idEvento) async {
+                  Map<String, dynamic> datosEvento = await DB.obtenerDatosEvento(idEvento);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => eventoIndividual(
+                        nombre: datosEvento['nombre'] ?? '',
+                        tipoEvento: datosEvento['tipoEvento'] ?? '',
+                        propietario: datosEvento['propietario'] ?? '',
+                        idEvento: datosEvento['id'] ?? '',
+                        isMine: true, //Como soy invitado paso un FALSE en este campo
+                        fechaEvento: datosEvento['fechaEvento'] ?? '',
+                        horaEvento: datosEvento['horaEvento'] ?? '',
+                        idUsuarioActual: uid,
+                      ),
+                    ),
+                  );
                   setState(() {
                     nombre.text = "";
                     tipoEvento.text = "";
                     fechaEvento.text = "";
                     horaEvento.text = "";
+                    _index = 0;
                   });
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("TU EVENTO SE CREÓ CON ÉXITO!")));
                 });
               },
               child: Text("Crear"),

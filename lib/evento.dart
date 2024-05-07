@@ -3,30 +3,37 @@ import 'package:gallery_memories/serviciosremotos.dart';
 import 'package:file_picker/file_picker.dart';
 
 class eventoIndividual extends StatefulWidget {
-  final String nombre, tipoEvento,propietario, idEvento, fechaEvento, horaEvento;
+  final String nombre, tipoEvento,propietario, idEvento, fechaEvento, horaEvento, idUsuarioActual;
   final bool isMine;
-  eventoIndividual({required this.nombre, required this.tipoEvento, required this.idEvento, required this.propietario, required this.isMine, required this.fechaEvento, required this.horaEvento});
+  eventoIndividual({required this.nombre, required this.tipoEvento, required this.idEvento, required this.propietario, required this.isMine, required this.fechaEvento, required this.horaEvento, required this.idUsuarioActual});
 
   @override
   State<eventoIndividual> createState() => _eventoIndividualState();
 }
 
 class _eventoIndividualState extends State<eventoIndividual> {
-  void initState() {
+  String bar = "EVENTO";
 
+  void initState() {
+    if(widget.isMine){
+      bar = "MI EVENTO";
+    }else{
+      bar = "EVENTO";
+    }
   }
   @override
   Widget build(BuildContext context) {
     print("El evento es mio: ${widget.isMine}");
     return Scaffold(
       appBar: AppBar(
-        title: Text("EVENTO"),
+        title: Text(bar),
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(vertical: 20, horizontal: 30),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            //Nombre del evento
             Center(
               child: Text(
                 widget.nombre,
@@ -38,10 +45,14 @@ class _eventoIndividualState extends State<eventoIndividual> {
             _buildEventInfo("Tipo de evento", widget.tipoEvento),
             _buildEventInfo("Fecha", widget.fechaEvento),
             _buildEventInfo("Hora", widget.horaEvento),
+            SizedBox(height: 10,),
             // Aquí van las fotos
             Container(
               height: 400,
-              color: Colors.white54,
+              decoration: BoxDecoration(
+                color: Colors.lightBlue[100],
+                borderRadius: BorderRadius.circular(4),
+              ),
               child: FutureBuilder(
                 // Obtiene las fotos del evento desde el servicio remoto
                 future: Storage.obtenerFotos(widget.idEvento),
@@ -50,15 +61,15 @@ class _eventoIndividualState extends State<eventoIndividual> {
                     // Si hay datos disponibles, muestra las fotos en un GridView
                     return GridView.builder(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 8.0,
-                        mainAxisSpacing: 8.0,
+                        crossAxisCount: 3,  //Numero de columnas en la cuadricula
+                        crossAxisSpacing: 2.0,
+                        mainAxisSpacing: 2.0,
                       ),
-                      itemCount: listaRegreso.data?.items.length,
+                      itemCount: listaRegreso.data?.items.length,  //Numero de elementos en la cuadricula
                       itemBuilder: (context, indice) {
                         final nombreImagen = listaRegreso.data!.items[indice].name;
                         return Padding(
-                          padding: EdgeInsets.all(10),
+                          padding: EdgeInsets.all(3),
                           child: FutureBuilder(
                             future: Storage.obtenerURLimagen(widget.idEvento, nombreImagen),
                             builder: (context, URL) {
@@ -70,7 +81,6 @@ class _eventoIndividualState extends State<eventoIndividual> {
                                       builder: (BuildContext context) {
                                         // Almacenar el contexto en una variable local
                                         BuildContext dialogContext = context;
-
                                         return Dialog(
                                           child: Stack(
                                             children: [
@@ -78,15 +88,63 @@ class _eventoIndividualState extends State<eventoIndividual> {
                                               Positioned(
                                                 top: 10,
                                                 right: 10,
+                                                //Codigo del botón para borrar la foto
                                                 child: Opacity(
-                                                  opacity: widget.isMine ? 1.0 : 0.0,
+                                                  opacity: puedoBorrarFoto(nombreImagen, widget.isMine) ? 1.0 : 0.0,
                                                   child: IgnorePointer(
-                                                    ignoring: !widget.isMine,
+                                                    ignoring: puedoBorrarFoto(nombreImagen, widget.isMine) == false,
                                                     child: IconButton(
-                                                      icon: Icon(Icons.delete, color: Colors.white),
                                                       onPressed: () {
                                                         // BORRAR FOTO
-                                                      },
+                                                        showDialog(
+                                                            context: context,
+                                                            builder: (context){
+                                                              return AlertDialog(
+                                                                title: Center(
+                                                                  child: Row(
+                                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                                    children: [
+                                                                      Icon(Icons.warning_amber_outlined, color: Colors.red),
+                                                                      SizedBox(width: 8),
+                                                                      Text("Comprobar eliminación.", style: TextStyle(color: Colors.red)),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                                content: Column(
+                                                                  mainAxisSize: MainAxisSize.min,
+                                                                  children: [
+                                                                    Text(
+                                                                      "¿Está seguro de eliminar esta foto?",
+                                                                      style: TextStyle(fontSize: 16),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                                actions: [
+                                                                  TextButton(
+                                                                    onPressed: () {
+                                                                      Storage.eliminarImagen(widget.idEvento, nombreImagen).then((value) {
+                                                                        ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text("IMAGEN ELIMINADA.")));
+                                                                        setState(() {});
+
+                                                                        // Usar la variable dialogContext en lugar de context
+                                                                        Navigator.of(dialogContext).pop();
+                                                                      });
+                                                                    },
+                                                                    child: Text("Aceptar"),
+                                                                  ),
+                                                                  TextButton(
+                                                                    onPressed: () {
+                                                                      // Usar la variable dialogContext en lugar de context
+                                                                      Navigator.of(context).pop();
+                                                                    },
+                                                                    child: Text("Cancelar"),
+                                                                  ),
+                                                                ],
+                                                              );
+                                                            }
+                                                        );
+                                                      } ,
+                                                      icon: Icon(Icons.delete, color: Colors.white54,),
                                                     ),
                                                   ),
                                                 ),
@@ -127,6 +185,7 @@ class _eventoIndividualState extends State<eventoIndividual> {
         ),
       ),
 
+      //Botón para agregar fotos al album
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final archivosAEnviar = await FilePicker.platform.pickFiles(
@@ -142,7 +201,7 @@ class _eventoIndividualState extends State<eventoIndividual> {
 
           for (var archivo in archivosAEnviar.files) {
             var path = archivo.path!;
-            var nombre = archivo.name!;
+            var nombre = "${widget.idUsuarioActual}${archivo.name}";
             var nombreCarpeta = widget.idEvento;
 
             Storage.subirFoto(path, nombre, nombreCarpeta).then((value) {
@@ -158,10 +217,11 @@ class _eventoIndividualState extends State<eventoIndividual> {
     );
   }
 
+  //Componentes para mostrar datos del evento
   Widget _buildEventInfo(String title, String value) {
     return Container(
       margin: EdgeInsets.symmetric(vertical: 5),
-      padding: EdgeInsets.all(8),
+      padding: EdgeInsets.all(5),
       decoration: BoxDecoration(
         color: Colors.lightBlueAccent[200],
         borderRadius: BorderRadius.circular(10),
@@ -180,5 +240,13 @@ class _eventoIndividualState extends State<eventoIndividual> {
         ],
       ),
     );
+  }
+
+  bool puedoBorrarFoto(String nombre, bool esMiEvento){
+    if(nombre.contains(widget.idUsuarioActual) || esMiEvento == true){
+      return true;
+    }else{
+      return false;
+    }
   }
 }

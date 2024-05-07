@@ -236,4 +236,19 @@ class Storage {
       return await carpetaRemota.ref(carpeta).listAll();
   }
 
+  static Future<void> eliminarImagen(String nombreCarpeta, String nombreImagen) async {
+    try {
+      // Obtener la referencia del archivo a eliminar
+      var referenciaArchivo = carpetaRemota.ref("$nombreCarpeta/$nombreImagen");
+
+      // Eliminar el archivo
+      await referenciaArchivo.delete();
+
+      print("Imagen eliminada correctamente.");
+    } catch (error) {
+      print("Error al eliminar la imagen: $error");
+      // Puedes manejar el error de acuerdo a tus necesidades
+    }
+  }
+
 }
