@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gallery_memories/login.dart';
@@ -31,6 +32,9 @@ class _inicioAppState extends State<inicioApp> {
   final fechaEvento = TextEditingController();
   final horaEvento = TextEditingController();
   final numInvitacion = TextEditingController();
+  //Controllers para cambiar los datos del usuario
+  final username = TextEditingController();
+  final nickname = TextEditingController();
 
 
   //Variables para consultar un evento como invitado
@@ -46,10 +50,17 @@ class _inicioAppState extends State<inicioApp> {
       List<String> datosUsuario = await DB.recuperarDatos(uid);
 
       setState(() {
+        //Obtener los datos del usuario y almacenarlos en variables
         uid = user.uid;
         nombre_usuario = datosUsuario[0];
-        print("Tu usuario es:  $nombre_usuario");
         abreviatura = datosUsuario[1];
+
+        print("Tu usuario es:  $nombre_usuario");
+
+        //Establecer los datos en los controllers de Mi perfil
+        username.text = nombre_usuario;
+        nickname.text = abreviatura;
+
       });
     }
   }
@@ -81,30 +92,56 @@ class _inicioAppState extends State<inicioApp> {
         ),
       ),
       body: dinamico(),
-      drawer: Drawer(
+      drawer:Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
             DrawerHeader(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.white,
-                    child: Text(
-                      abreviatura,
-                      style: TextStyle(fontSize: 20, color: Colors.blue),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 10,
-                  ),
-                  Text(
-                    nombre_usuario,
-                    style: TextStyle(color: Colors.white, fontSize: 20),
-                  )
-                ],
+              child: FutureBuilder(
+                future: Storage.obtenerURLimagen("profile_photos", "$uid.jpg"),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return CircularProgressIndicator();
+                  } else if (snapshot.hasError) {
+                     return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 40,
+                          backgroundColor: Colors.white,
+                          child: Icon(
+                            Icons.person, // Puedes cambiar este icono por el que desees
+                            size: 60,
+                            color: Colors.blue,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          nombre_usuario,
+                          style: TextStyle(color: Colors.white, fontSize: 20),
+                        ),
+                      ],
+                    );
+                  } else {
+                    print("URL de la imagen de perfil: ${snapshot.data}");
+
+                    return Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 40,
+                          backgroundColor: Colors.white,
+                          backgroundImage: NetworkImage(snapshot.data.toString()),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          nombre_usuario,
+                          style: TextStyle(color: Colors.white, fontSize: 20),
+                        ),
+                      ],
+                    );
+                  }
+                },
               ),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -117,16 +154,17 @@ class _inicioAppState extends State<inicioApp> {
                 ),
               ),
             ),
+            // Resto de elementos del Drawer
             _item(Icons.event, "MIS EVENTOS", 0),
             _item(Icons.mode_of_travel_outlined, "MIS INVITACIONES", 1),
             _item(Icons.add, "AGREGAR EVENTO", 2),
             _item(Icons.create_new_folder, "CREAR EVENTO", 3),
             _item(Icons.settings, "CONFIGURACIÓN", 4),
-            _item(Icons.exit_to_app, "SALIR", 5),
+            _item(Icons.supervised_user_circle, "MI PERFIL", 5),
+            _item(Icons.exit_to_app, "SALIR", 6),
           ],
         ),
-      ),
-
+      )
     );
   }
 
@@ -162,7 +200,9 @@ class _inicioAppState extends State<inicioApp> {
        return crearEvento();
      case 4:
        return configuracion();
-     case 5 :
+     case 5:
+       return miPerfil();
+     case 6 :
        //Navegar a la pantalla del login (cerrar sesión)
        Future.delayed(Duration.zero, () {
          Navigator.pushReplacement(
@@ -409,6 +449,56 @@ class _inicioAppState extends State<inicioApp> {
                                           ),
                                           IconButton(
                                             onPressed: () {
+                                              //BOTON PARA ELIMINARME DE INVITADO DE ESTE EVENTO
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) {
+                                                  return AlertDialog(
+                                                    title: Center(
+                                                      child: Row(
+                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                        children: [
+                                                          Icon(Icons.warning_amber_outlined, color: Colors.red),
+                                                          SizedBox(width: 8),
+                                                          Text("Comprobar eliminación.", style: TextStyle(color: Colors.red)),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    content: Column(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          "¿Está seguro de eliminar el evento?",
+                                                          style: TextStyle(fontSize: 16),
+                                                        ),
+                                                        SizedBox(height: 8),
+                                                        Text(
+                                                          "${listaJSON.data?[indice]['nombre']}",
+                                                          style: TextStyle(fontWeight: FontWeight.bold),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () {
+                                                          DB.eliminarInvitado("${listaJSON.data?[indice]['id']}", uid).then((value) {
+                                                            setState(() {});
+                                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Saliste del evento ${listaJSON.data?[indice]['id']}")));
+                                                          });
+                                                          Navigator.of(context).pop();
+                                                        },
+                                                        child: Text("Aceptar"),
+                                                      ),
+                                                      TextButton(
+                                                        onPressed: () {
+                                                          Navigator.of(context).pop();
+                                                        },
+                                                        child: Text("Cancelar"),
+                                                      ),
+                                                    ],
+                                                  );
+                                                },
+                                              );
                                             },
                                             icon: Icon(Icons.close, color: Colors.red,),
                                           ),
@@ -675,7 +765,174 @@ class _inicioAppState extends State<inicioApp> {
   }
 
   Widget configuracion(){
-    return Center(child: Text("PESTAÑA CONFIGURACION"),);
+    return Center(child: Text("PESTAÑA CONFIGURACIÓN"),);
+  }
+
+  Widget miPerfil(){
+    return ListView(
+      padding: EdgeInsets.all(30),
+      children: [
+        Center(
+          child: Text("MI PERFIL", style: TextStyle(fontFamily: 'BebasNeue', fontSize: 30),),
+        ),
+        SizedBox(height: 20,),
+        Container(
+          child: FutureBuilder(
+            future: Storage.obtenerURLimagen("profile_photos", "$uid.jpg"),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return CircularProgressIndicator();
+              } else if (snapshot.hasError) { //NO EXISTE FOTO DE PERFIL
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircleAvatar(
+                      radius: 80,
+                      backgroundColor: Colors.white,
+                      backgroundImage: NetworkImage("https://cdn-icons-png.flaticon.com/512/9187/9187604.png"),
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            bottom: 10,
+                            right: 10,
+                            child: GestureDetector(
+                              onTap: () async {
+                                final fotoNueva = await FilePicker.platform.pickFiles(
+                                    allowMultiple: false,
+                                    type: FileType.custom,
+                                    allowedExtensions: ['png', 'jpg', 'jpeg']
+                                );
+
+                                if (fotoNueva == null || fotoNueva.files.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No se ha seleccionado ninguna foto.")));
+                                  return;
+                                }
+
+                                var path = fotoNueva.files.first.path!;
+                                var nombre = "$uid.jpg";
+                                var nombreCarpeta = "profile_photos";
+
+                                Storage.subirFoto(path, nombre, nombreCarpeta).then((value) {
+                                  setState(() {
+                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("FOTO ACTUALIZADA CON ÉXITO!")));
+                                  });
+                                });
+
+                                print("Botón '+' presionado");
+                              },
+                              child: Container(
+                                padding: EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.blue,
+                                ),
+                                child: Icon(
+                                  Icons.add,
+                                  color: Colors.white,
+                                  size: 25,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              } else {
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircleAvatar(
+                      radius: 80,
+                      backgroundColor: Colors.white,
+                      backgroundImage: NetworkImage(snapshot.data.toString()),
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            bottom: 10,
+                            right: 10,
+                            child: GestureDetector(
+                              onTap: () async {
+                                final fotoNueva = await FilePicker.platform.pickFiles(
+                                    allowMultiple: false,
+                                    type: FileType.custom,
+                                    allowedExtensions: ['png', 'jpg', 'jpeg']
+                                );
+
+                                if (fotoNueva == null || fotoNueva.files.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No se ha seleccionado ninguna foto.")));
+                                  return;
+                                }
+
+                                var path = fotoNueva.files.first.path!;
+                                var nombre = "$uid.jpg";
+                                var nombreCarpeta = "profile_photos";
+
+                                Storage.subirFoto(path, nombre, nombreCarpeta).then((value) {
+                                  setState(() {
+                                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("FOTO ACTUALIZADA CON ÉXITO!")));
+                                  });
+                                });
+
+                                print("Botón '+' presionado");
+                              },
+                              child: Container(
+                                padding: EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.blue,
+                                ),
+                                child: Icon(
+                                  Icons.add,
+                                  color: Colors.white,
+                                  size: 25,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }
+            },
+          ),
+        ),
+        SizedBox(height: 20,),
+        TextField(
+          controller: username,
+          decoration: InputDecoration(
+              labelText: "Nombre de usuario:", border: OutlineInputBorder()),
+        ),
+        SizedBox(
+          height: 20,
+        ),
+        TextField(
+          controller: nickname,
+          decoration: InputDecoration(
+              labelText: "Alias de tu usario:",
+              border: OutlineInputBorder()),
+        ),
+        SizedBox(
+          height: 20,
+        ),
+        ElevatedButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Cambios realizados")));
+              setState(() {
+                DB.actualizarDatosUsuario(uid, username.text, nickname.text).then((value){
+                  setState(() {
+                    this.nombre_usuario = username.text;
+                    this.abreviatura = nickname.text;
+                  });
+                } );
+              });
+            },
+            child: const Text("Guardar")),
+      ],
+    );
   }
 
 // Componente para seleccionar fecha en formato DD/Mes/YYYY

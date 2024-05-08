@@ -13,6 +13,19 @@ class eventoIndividual extends StatefulWidget {
 
 class _eventoIndividualState extends State<eventoIndividual> {
   String bar = "EVENTO";
+  String estatusEvento = "";
+
+  void setStatus() async {
+    bool? estado = await DB.obtenerEstado(widget.idEvento);
+
+    setState(() {
+      if (estado == true) {
+        estatusEvento = "CERRAR EVENTO";
+      } else {
+        estatusEvento = "ABRIR EVENTO";
+      }
+    });
+  }
 
   void initState() {
     if(widget.isMine){
@@ -20,6 +33,9 @@ class _eventoIndividualState extends State<eventoIndividual> {
     }else{
       bar = "EVENTO";
     }
+
+    setStatus();
+    super.initState();
   }
   @override
   Widget build(BuildContext context) {
@@ -45,7 +61,29 @@ class _eventoIndividualState extends State<eventoIndividual> {
             _buildEventInfo("Tipo de evento", widget.tipoEvento),
             _buildEventInfo("Fecha", widget.fechaEvento),
             _buildEventInfo("Hora", widget.horaEvento),
-            SizedBox(height: 10,),
+            Center(
+              child: Opacity(
+                  opacity: widget.isMine ? 1.0 : 0.0,
+                  child: IgnorePointer(ignoring: !widget.isMine,
+                    child: TextButton(
+                      onPressed: () {
+                        DB.cambiarEstado(widget.idEvento).then((value) {
+                          setState(() async {
+                            bool? estado = await DB.obtenerEstado(widget.idEvento);
+                            if (estado == true) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("EVENTO ABIERTO")));
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("EVENTO CERRADO")));
+                            }
+                            setStatus();
+                          });
+                        });
+                      },
+                      child: Text(estatusEvento),
+                    ),
+                  )
+              ),
+            ),
             // Aquí van las fotos
             Container(
               height: 400,
@@ -180,11 +218,12 @@ class _eventoIndividualState extends State<eventoIndividual> {
                 },
               ),
             ),
-            // ...
+            //BOTON PARA CERRAR EL EVENTO
+
+
           ],
         ),
       ),
-
       //Botón para agregar fotos al album
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
