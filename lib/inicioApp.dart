@@ -5,6 +5,9 @@ import 'package:gallery_memories/login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gallery_memories/serviciosremotos.dart';
 import 'package:gallery_memories/evento.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+
 class inicioApp extends StatefulWidget {
   const inicioApp({super.key});
 
@@ -69,7 +72,6 @@ class _inicioAppState extends State<inicioApp> {
     setUser();
     super.initState();
   }
-
 
   Widget build(BuildContext context) {
     return Scaffold(
@@ -330,9 +332,22 @@ class _inicioAppState extends State<inicioApp> {
                                           //BOTÓN PARA COMPARTIR EL EVENTO
                                           IconButton(
                                               onPressed: (){
+                                                void enviarMensajeWhatsApp() async {
+                                                  String mensaje = Uri.encodeFull("${listaJSON.data?[indice]['id']}");
+                                                  String telefono = '3221712894'; // Reemplaza esto con el número de teléfono al que deseas enviar el mensaje
+                                                  String url = 'https://wa.me/?text=$mensaje';
+
+                                                  if (await canLaunch(url)) {
+                                                    await launch(url);
+                                                  } else {
+                                                    throw 'No se pudo abrir WhatsApp.';
+                                                  }
+                                                }
+                                                enviarMensajeWhatsApp();
                                                 //Buscar COMPONENTE PARA ENVIAR MSJ POR WHATSAPP
                                                 //compartirTexto("Hola! Me gustaría que te unieras a mi album en Gallery Memories. Ingresa el código ${listaJSON.data?[indice]['id']} en Agregar Evento");
                                               },
+
                                               icon: Icon(Icons.share, color: Colors.blueGrey,)
                                           ),
                                         ],
