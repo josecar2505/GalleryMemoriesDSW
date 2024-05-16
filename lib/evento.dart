@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:gallery_memories/inicioApp.dart';
 import 'package:gallery_memories/serviciosremotos.dart';
 import 'package:file_picker/file_picker.dart';
 
 class eventoIndividual extends StatefulWidget {
-  final String nombre, tipoEvento,propietario, idEvento, fechaEvento, horaEvento, idUsuarioActual;
+  String nombre, tipoEvento,propietario, idEvento, fechaEvento, horaEvento, idUsuarioActual;
   final bool isMine;
   eventoIndividual({required this.nombre, required this.tipoEvento, required this.idEvento, required this.propietario, required this.isMine, required this.fechaEvento, required this.horaEvento, required this.idUsuarioActual});
 
@@ -43,6 +44,18 @@ class _eventoIndividualState extends State<eventoIndividual> {
     return Scaffold(
       appBar: AppBar(
         title: Text(bar),
+        actions: [
+          Opacity(opacity: widget.isMine ? 1.0 : 0.0,
+          child: IgnorePointer(
+            ignoring: !widget.isMine,
+            child: IconButton(
+                icon: Icon(Icons.edit),
+                onPressed: (){
+                  _mostrarFormularioEdicion(context);
+                }
+            ),
+          ),)
+        ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.symmetric(vertical: 20, horizontal: 30),
@@ -287,5 +300,157 @@ class _eventoIndividualState extends State<eventoIndividual> {
     }else{
       return false;
     }
+  }
+
+  void _mostrarFormularioEdicion(BuildContext context) async {
+    // Crear controladores para los campos de texto con los valores actuales
+    TextEditingController nombreController = TextEditingController(text: widget.nombre);
+    TextEditingController tipoEventoController = TextEditingController(text: widget.tipoEvento);
+    TextEditingController fechaController = TextEditingController(text: widget.fechaEvento);
+    TextEditingController horaController = TextEditingController(text: widget.horaEvento);
+
+    // Mostrar el diálogo de edición
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Editar evento'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Campos de texto para editar los detalles del evento
+                TextField(
+                  controller: nombreController,
+                  decoration: InputDecoration(labelText: 'Nombre del evento'),
+                ),
+                TextField(
+                  controller: tipoEventoController,
+                  decoration: InputDecoration(labelText: 'Tipo de evento'),
+                ),
+                TextField(
+                  controller: fechaController,
+                  decoration: InputDecoration(labelText: "Fecha",),
+                  readOnly: true,
+                  onTap: () {
+                    _selectDate(fechaController);
+                  },
+                ),
+                TextField(
+                  controller: horaController,
+                  decoration: InputDecoration(labelText: "Hora",),
+                  readOnly: true,
+                  onTap: () {
+                    _selectTime(horaController);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            // Botón para guardar los cambios
+            TextButton(
+              onPressed: () async {
+                // Actualizar el evento en la base de datos con los nuevos valores
+                await DB.actualizarEvento(widget.idEvento, nombreController.text, tipoEventoController.text, fechaController.text, horaController.text);
+
+                // Recuperar los nuevos datos del evento
+                Map<String, dynamic> nuevoEvento = await DB.obtenerDatosEvento(widget.idEvento);
+
+                // Asignar los nuevos valores a las variables de estado
+                setState(() {
+                  widget.nombre = nuevoEvento['nombre'];
+                  widget.tipoEvento = nuevoEvento['tipoEvento'];
+                  widget.fechaEvento = nuevoEvento['fechaEvento'];
+                  widget.horaEvento = nuevoEvento['horaEvento'];
+                });
+
+                // Cerrar el diálogo de edición
+                Navigator.of(context).pop();
+              },
+              child: Text('Guardar'),
+            ),
+            // Botón para cancelar la edición
+            TextButton(
+              onPressed: () {
+                // Cerrar el diálogo de edición sin guardar los cambios
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Componente para seleccionar fecha en formato DD/Mes/YYYY
+  Future<void> _selectDate(TextEditingController controlador) async {
+    // Lista de nombres de meses en español
+    final List<String> _meses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    // Mostrar el selector de fecha
+    DateTime? _picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+
+    // Si el usuario selecciona una fecha
+    if (_picked != null) {
+      // Formatear la fecha seleccionada en formato DD/Mes/YYYY
+      String day = _picked.day.toString().padLeft(2, '0'); // Añade un cero al día si es necesario
+      String month = _meses[_picked.month - 1]; // Obtiene el nombre del mes
+      String year = _picked.year.toString(); // Obtiene el año
+      String formattedDate = '$day/$month/$year';
+
+      // Actualizar el estado del controlador de texto con la fecha seleccionada
+      setState(() {
+        controlador.text = formattedDate;
+      });
+    }
+  }
+
+// Componente para seleccionar hora en formato de 12 horas
+  Future<void> _selectTime(TextEditingController controlador) async {
+    // Mostrar el selector de hora
+    TimeOfDay? _picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(), // Hora inicial es la hora actual
+      builder: (BuildContext context, Widget? child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: false),
+          child: child!,
+        );
+      },
+    );
+
+    // Si el usuario selecciona una hora
+    if (_picked != null) {
+      // Convertir la hora seleccionada a formato de 12 horas
+      String formattedTime = _formatTime(_picked.hour, _picked.minute);
+
+      // Actualizar el estado del controlador de texto con la hora seleccionada
+      setState(() {
+        controlador.text = formattedTime;
+      });
+    }
+  }
+
+// Función para formatear la hora en formato de 12 horas
+  String _formatTime(int hour, int minute) {
+    String period = 'AM';
+    if (hour >= 12) {
+      period = 'PM';
+      hour = hour % 12;
+    }
+    if (hour == 0) {
+      hour = 12;
+    }
+    return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
   }
 }

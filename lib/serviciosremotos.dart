@@ -32,6 +32,22 @@ class DB{
     return idUsuario;
   }
 
+  static Future<void> eliminaUsuario(String uid) async {
+    try {
+      await baseremota.collection('usuarios').doc(uid).delete();
+    } catch (e) {
+      print('Error al eliminar el usuario: $e');
+    }
+  }
+
+  static Future<void> eliminarEvento(String idEvento) async {
+    try{
+      await baseremota.collection('eventos').doc(idEvento).delete();
+    } catch (e){
+      print("Error al eliminar el evento: $e");
+    }
+  }
+
   static creaEvento(Map<String, dynamic> evento) async {
     DocumentReference eventoRef = await baseremota.collection("eventos").add(evento);
     return eventoRef.id;
@@ -112,14 +128,14 @@ class DB{
 
           if (propietarioEvento == uid) {
             // Si el usuario es el propietario del evento, no puede registrarse como invitado
-            print("Eres el propietario de este evento, no puedes registrarte como invitado!!!");
+            print("Eres el propietario de este evento, no puedes registrarte como invitado.");
             return false;
           }
 
           List<dynamic> invitados = eventoData['invitados'] ?? [];
-          if (!invitados.contains(uid)) {
+          if (!invitados.any((invitado) => invitado['idInvitado'] == uid)) {
             // Si el usuario no está en la lista de invitados, agréguelo
-            invitados.add(uid);
+            invitados.add({'idInvitado': uid, 'acceso': true});
             await baseremota.collection("eventos").doc(idEvento).update({'invitados': invitados});
             print("Invitado agregado con éxito al evento con ID $idEvento");
             return true;
@@ -144,11 +160,8 @@ class DB{
 
   static Future<void> eliminarInvitado(String idEvento, String idInvitado) async {
     try {
-      // Obtener una referencia al documento del evento
-      DocumentReference eventoRef = FirebaseFirestore.instance.collection('eventos').doc(idEvento);
-
       // Obtener el documento actual
-      DocumentSnapshot eventoSnapshot = await eventoRef.get();
+      DocumentSnapshot eventoSnapshot = await baseremota.collection('eventos').doc(idEvento).get();
 
       if (eventoSnapshot.exists) {
         // Obtener los datos actuales del evento
@@ -157,11 +170,11 @@ class DB{
         // Obtener la lista de invitados
         List<dynamic> invitados = datosEvento['invitados'] ?? [];
 
-        // Eliminar el idInvitado de la lista de invitados
-        invitados.remove(idInvitado);
+        // Eliminar el invitado de la lista de invitados
+        invitados.removeWhere((invitado) => invitado['idInvitado'] == idInvitado);
 
         // Actualizar el campo 'invitados' en Firestore
-        await eventoRef.update({'invitados': invitados});
+        await baseremota.collection('eventos').doc(idEvento).update({'invitados': invitados});
 
         print('Invitado eliminado correctamente.');
       } else {
@@ -174,27 +187,35 @@ class DB{
 
   static Future<List<Map<String, dynamic>>> misInvitaciones(String uid) async{
     List<Map<String, dynamic>> temp = [];
-    var query = await baseremota.collection("eventos").where('invitados', arrayContains: uid).where('estatus', isEqualTo: true).get();
 
-    for (var element in query.docs) {
-      Map<String, dynamic> dato = element.data();
-      dato['id'] = element.id;
+    try {
+      var query = await baseremota.collection("eventos")
+          .where('invitados', arrayContains: {'idInvitado': uid, 'acceso': true})
+          .where('estatus', isEqualTo: true)
+          .get();
 
-      // Obtener el nombre del propietario del evento
-      var propietarioEvento = dato['propietario'];
-      var documentoUsuario = await baseremota.collection("usuarios").doc(propietarioEvento).get();
-      // Si encuentra el documento del usuario, sustituye el campo 'propietario' por el nombre del usuario
-      if (documentoUsuario.exists) {
-        var nombrePropietario = documentoUsuario.data()?['nombre'];
-        dato['propietario'] = nombrePropietario;
-      } else {
-        print("No se encontró ningún documento de usuario con el ID $propietarioEvento");
+      for (var element in query.docs) {
+        Map<String, dynamic> dato = element.data();
+        dato['id'] = element.id;
+        // Obtener el nombre del propietario del evento
+        var propietarioEvento = dato['propietario'];
+        var documentoUsuario = await baseremota.collection("usuarios").doc(propietarioEvento).get();
+        // Si encuentra el documento del usuario, sustituye el campo 'propietario' por el nombre del usuario
+        if (documentoUsuario.exists) {
+          var nombrePropietario = documentoUsuario.data()?['nombre'];
+          dato['propietario'] = nombrePropietario;
+        } else {
+          print("No se encontró ningún documento de usuario con el ID $propietarioEvento");
+        }
+
+        temp.add(dato);
       }
 
-      temp.add(dato);
+      return temp;
+    } catch (e) {
+      print('Error al obtener invitaciones del usuario: $e');
+      return [];
     }
-
-    return temp;
   }
 
   static Future<Map<String, dynamic>> obtenerDatosEvento(String idEvento) async {
@@ -303,7 +324,125 @@ class DB{
     }
   }
 
+  static Future<void>  actualizarEvento(eventoId, String nombre, String tipo, String fecha, String hora) async {
+    try {
+      var query = await baseremota.collection("eventos").doc(eventoId).get();
 
+      if (query.exists) {
+        // Actualizar los datos del evento
+        await baseremota.collection("eventos").doc(eventoId).update({
+          'nombre': nombre,
+          'tipoEvento': tipo,
+          'fechaEvento': fecha,
+          'horaEvento': hora
+        });
+        print("Evento actualizado correctamente.");
+      } else {
+        print("No se encontró ningún evento con el ID $eventoId.");
+      }
+    } catch (e) {
+      print("Error al actualizar el evento: $e");
+    }
+  }
+
+  static Future<List<dynamic>> obtenerListaInvitados(String idEvento) async {
+    try {
+      // Obtener la referencia al documento de invitados en Firebase
+      DocumentSnapshot<
+          Map<String, dynamic>> invitadosSnapshot = await FirebaseFirestore
+          .instance
+          .collection('eventos')
+          .doc(idEvento)
+          .get();
+
+      // Verificar si el documento existe y tiene datos
+      if (invitadosSnapshot.exists) {
+        // Obtener la lista de invitados del campo 'invitados' en el documento
+        List<dynamic> invitadosList = invitadosSnapshot.data()?['invitados'];
+
+        // Crear una lista para almacenar los datos modificados de invitados
+        List<Map<String, dynamic>> invitadosConNombre = [];
+
+        // Iterar sobre la lista de invitados
+        for (var invitado in invitadosList) {
+          String idInvitado = invitado['idInvitado'];
+          bool tieneAcceso = invitado['acceso'];
+
+          // Obtener el nombre del usuario correspondiente al idInvitado
+          DocumentSnapshot<
+              Map<String, dynamic>> usuarioSnapshot = await FirebaseFirestore
+              .instance
+              .collection('usuarios')
+              .doc(idInvitado)
+              .get();
+
+          // Verificar si el usuario existe y tiene datos
+          if (usuarioSnapshot.exists) {
+            // Obtener el nombre del usuario
+            String nombreUsuario = usuarioSnapshot.data()?['nombre'];
+
+            // Agregar el nombre del usuario al mapa de invitado
+            Map<String, dynamic> invitadoConNombre = {
+              'idInvitado': idInvitado,
+              'acceso': tieneAcceso,
+              'nombre': nombreUsuario,
+            };
+
+            // Agregar el mapa de invitado a la lista de invitados con nombre
+            invitadosConNombre.add(invitadoConNombre);
+          }
+        }
+
+        return invitadosConNombre;
+      } else {
+        // Devolver una lista vacía si el documento no existe
+        return [];
+      }
+    } catch (e) {
+      // Manejar el error si ocurre al obtener los datos de Firebase
+      print('Error al obtener la lista de invitados: $e');
+      return [];
+    }
+  }
+
+  static Future<void> actualizarAccesoInvitado(String idEvento, String idInvitado, bool nuevoAcceso) async {
+    try {
+      // Obtener la referencia al documento del evento en la base de datos
+      var eventoDoc = baseremota.collection('eventos').doc(idEvento);
+
+      // Obtener los datos del documento
+      var eventoSnapshot = await eventoDoc.get();
+
+      // Verificar si el documento existe y contiene datos
+      if (eventoSnapshot.exists) {
+        // Obtener el arreglo de invitados del documento
+        List<dynamic> invitadosList = eventoSnapshot.data()?['invitados'];
+
+        // Buscar el invitado por su ID
+        for (var invitado in invitadosList) {
+          if (invitado['idInvitado'] == idInvitado) {
+            // Actualizar el acceso del invitado
+            invitado['acceso'] = nuevoAcceso;
+
+            // Guardar los cambios en Firestore
+            await eventoDoc.update({'invitados': invitadosList});
+
+            print('Acceso actualizado para el invitado con ID: $idInvitado');
+            return;
+          }
+        }
+
+        // Si no se encontró el invitado
+        print('No se encontró el invitado con ID: $idInvitado');
+      } else {
+        print('El documento del evento no existe');
+      }
+    } catch (e) {
+      // Manejar el error si ocurre al actualizar los datos en la base de datos
+      print('Error al actualizar el acceso del invitado: $e');
+      throw e;
+    }
+  }
 }
 
 class Storage {
@@ -358,8 +497,14 @@ class Storage {
     return await carpetaRemota.ref("$nombreCarpeta/$nombreImagen").putFile(file);
   }
 
-  static Future<String> obtenerURLimagen(String nombreCarpeta,String nombre)async{
-    return await carpetaRemota.ref("$nombreCarpeta/$nombre").getDownloadURL();
+  static Future<String?> obtenerURLimagen(String nombreCarpeta,String nombre)async{
+    try {
+      return await carpetaRemota.ref("$nombreCarpeta/$nombre").getDownloadURL();
+    } catch (error) {
+      print('Error al obtener la URL de descarga de la imagen: $error');
+      // Si se produce un error, puedes devolver una URL predeterminada o null según tu caso
+      return null;
+    }
   }
 
   static Future<ListResult>  obtenerFotos(nombreCarpeta) async{

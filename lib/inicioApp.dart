@@ -325,8 +325,63 @@ class _inicioAppState extends State<inicioApp> {
                                           //BOTÓN PARA ELIMINAR EL EVENTO
                                           SizedBox(width: 20,),
                                           IconButton(
-                                              onPressed: (){},
+                                              onPressed: (){
+                                                showDialog(
+                                                    context: context,
+                                                    builder: (context){
+                                                      return AlertDialog(
+                                                        title: Center(
+                                                          child: Row(
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              Icon(Icons.warning_amber_outlined, color: Colors.red),
+                                                              SizedBox(width: 8),
+                                                              Text("Comprobar eliminación.", style: TextStyle(color: Colors.red)),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        content: Column(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Text(
+                                                              "¿Está seguro de eliminar el evento  ${listaJSON.data?[indice]['nombre']}?",
+                                                              style: TextStyle(fontSize: 16),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed: () {
+                                                              DB.eliminarEvento(listaJSON.data?[indice]['id']).then((value) {
+                                                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Evento ${listaJSON.data?[indice]['nombre']} borrado con éxito.")));
+                                                              });
+                                                              setState(() {});
+                                                              Navigator.of(context).pop();
+                                                            },
+                                                            child: Text("Aceptar"),
+                                                          ),
+                                                          TextButton(
+                                                            onPressed: () {
+                                                              // Usar la variable dialogContext en lugar de context
+                                                              Navigator.of(context).pop();
+                                                            },
+                                                            child: Text("Cancelar"),
+                                                          ),
+                                                        ],
+                                                      );
+                                                    }
+                                                );
+                                              },
                                               icon: Icon(Icons.close, color: Colors.red,)
+                                          ),
+                                          SizedBox(width: 20,),
+                                          IconButton(
+                                              onPressed: () {
+                                                mostrarListaInvitados(context, listaJSON.data?[indice]['id'], listaJSON.data?[indice]['nombre']).then((_) {
+                                                  setState(() {}); // Actualiza la interfaz de usuario después de cerrar la lista de invitados
+                                                });
+                                              },
+                                              icon: Icon(Icons.checklist_rtl_sharp)
                                           ),
                                           SizedBox(width: 20,),
                                           //BOTÓN PARA COMPARTIR EL EVENTO
@@ -780,7 +835,75 @@ class _inicioAppState extends State<inicioApp> {
   }
 
   Widget configuracion(){
-    return Center(child: Text("PESTAÑA CONFIGURACIÓN"),);
+    return ListView(
+        padding: EdgeInsets.all(30),
+        children: [
+      ElevatedButton(
+          onPressed: (){
+            showDialog(
+                context: context,
+                builder: (context){
+                  return AlertDialog(
+                    title: Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.warning_amber_outlined, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text("Comprobar eliminación.", style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "¿Está seguro de eliminar esta cuenta?",
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () async {
+                          //Borrar datos del usuario
+                          DB.eliminaUsuario(uid);
+                          //Borrar usuario
+                          User? user = FirebaseAuth.instance.currentUser;
+                          await user?.delete();
+
+                          //Salir al login
+                          Future.delayed(Duration.zero, () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (builder) {
+                                return login();
+                              }),
+                            );
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("USUARIO ELIMINADO")));
+                        },
+                        child: Text("Aceptar"),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          // Usar la variable dialogContext en lugar de context
+                          Navigator.of(context).pop();
+                        },
+                        child: Text("Cancelar"),
+                      ),
+                    ],
+                  );
+                }
+            );
+          },
+          style: ButtonStyle(
+            backgroundColor: MaterialStatePropertyAll<Color>(Colors.red),
+          ),
+          child: Text("BORRAR CUENTA")
+      )
+    ]
+    );
   }
 
   Widget miPerfil(){
@@ -950,7 +1073,7 @@ class _inicioAppState extends State<inicioApp> {
     );
   }
 
-// Componente para seleccionar fecha en formato DD/Mes/YYYY
+  // Componente para seleccionar fecha en formato DD/Mes/YYYY
   Future<void> _selectDate(TextEditingController controlador) async {
     // Lista de nombres de meses en español
     final List<String> _meses = [
@@ -981,7 +1104,7 @@ class _inicioAppState extends State<inicioApp> {
     }
   }
 
-// Componente para seleccionar hora en formato de 12 horas
+  // Componente para seleccionar hora en formato de 12 horas
   Future<void> _selectTime(TextEditingController controlador) async {
     // Mostrar el selector de hora
     TimeOfDay? _picked = await showTimePicker(
@@ -1007,7 +1130,7 @@ class _inicioAppState extends State<inicioApp> {
     }
   }
 
-// Función para formatear la hora en formato de 12 horas
+  // Función para formatear la hora en formato de 12 horas
   String _formatTime(int hour, int minute) {
     String period = 'AM';
     if (hour >= 12) {
@@ -1019,4 +1142,65 @@ class _inicioAppState extends State<inicioApp> {
     }
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
   }
+
+  // Función para mostrar la lista de invitados
+  Future<void> mostrarListaInvitados(BuildContext context, String idEvento, String nombreEvento) async {
+    // Obtener la lista de invitados
+    List<dynamic> invitados = await DB.obtenerListaInvitados(idEvento);
+    List<Widget> listaItems = [];
+
+    for (var invitado in invitados) {
+      String idInvitado = invitado['idInvitado'];
+      String nombre = invitado['nombre'];
+      bool tieneAcceso = invitado['acceso'];
+      String subtitulo = tieneAcceso ? "Tiene acceso" : "No tiene acceso";
+
+      // Agregar SwitchListTile a la lista de items
+      listaItems.add(
+        SwitchListTile(
+          title: Text(nombre),
+          subtitle: Text(subtitulo),
+          value: tieneAcceso,
+          onChanged: (bool value) async {
+            // Actualizar el valor de acceso en la base de datos
+            await DB.actualizarAccesoInvitado(idEvento, idInvitado, !tieneAcceso);
+
+            // Actualizar la lista de invitados
+            List<dynamic> nuevaListaInvitados = await DB.obtenerListaInvitados(idEvento);
+
+            // Actualizar el estado del widget y reconstruir la interfaz de usuario
+            setState(() {
+              invitados = nuevaListaInvitados;
+            });
+          },
+        ),
+      );
+    }
+
+    // Mostrar el AlertDialog con la lista de invitados
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Center(child: Text('Invitados al evento \n"$nombreEvento" '),),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: listaItems,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
 }

@@ -18,6 +18,7 @@ class _loginState extends State<login> {
 
   String email = "";
   String contrasena = "";
+  int intentosFallidos = 0;
 
   void _iniciarSesion() async {
     try {
@@ -31,18 +32,25 @@ class _loginState extends State<login> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Bienvenido: ${userCredential.user!.email}"),),
       );
 
+      setState(() {
+        intentosFallidos=0;
+      });
+
       // Una vez que el usuario ha iniciado sesión con éxito, navega a la pantalla de inicio de la aplicación.
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => inicioApp()), // Navega a la pantalla inicioApp.
       );
     } catch (e) {
+      setState(() {
+        intentosFallidos++;
+      });
+      print(intentosFallidos);
       // Si ocurre un error durante el inicio de sesión, se captura y se muestra un mensaje de error.
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error al Iniciar Sesión, Usuario o Contraseña incorrectas."),),
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +161,55 @@ class _loginState extends State<login> {
                           style: TextStyle(fontSize: 18),
                         ),
                       ),
-                      SizedBox(height: 10),
+                      Opacity(
+                        opacity: intentosFallidos >= 3 ? 1.0 : 0.0,
+                        child: IgnorePointer(
+                          ignoring: (intentosFallidos >= 3) ? false: true,
+                          child: TextButton(
+                            onPressed: () async {
+                              TextEditingController emailRest = TextEditingController();
+                              // Mostrar un AlertDialog
+                              showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return AlertDialog(
+                                    title: Text('Restablecer contraseña'),
+                                    content: TextField(
+                                      controller: emailRest,
+                                      decoration: InputDecoration(
+                                        labelText: 'Correo electrónico',
+                                      ),
+                                    ),
+                                    actions: <Widget>[
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.of(context).pop(); // Cerrar el AlertDialog
+                                        },
+                                        child: Text('Cancelar'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () async {
+                                          // Enviar el correo de restablecimiento de contraseña
+                                          try {
+                                            await FirebaseAuth.instance.sendPasswordResetEmail(email: emailRest.text);
+                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Se ha enviado un correo para restablecer la contraseña a ${emailRest.text}')));
+                                          } catch (error) {
+                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al enviar el correo de restablecimiento de contraseña: $error')));
+                                          }
+                                          // Cerrar el AlertDialog
+                                          Navigator.of(context).pop();
+                                        },
+                                        child: Text('Enviar'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                            child: Text("Olvidé mi contraseña"),
+                          ),
+                        ),
+                      ),
                       TextButton(
                         onPressed: () {
                           Navigator.push(
