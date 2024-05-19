@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:gallery_memories/inicioApp.dart';
 import 'package:gallery_memories/serviciosremotos.dart';
 import 'package:file_picker/file_picker.dart';
+
+import 'comentarios.dart';
 
 class eventoIndividual extends StatefulWidget {
   String nombre, tipoEvento,propietario, idEvento, fechaEvento, horaEvento, idUsuarioActual;
@@ -15,7 +16,6 @@ class eventoIndividual extends StatefulWidget {
 class _eventoIndividualState extends State<eventoIndividual> {
   String bar = "EVENTO";
   String estatusEvento = "";
-
   void setStatus() async {
     bool? estado = await DB.obtenerEstado(widget.idEvento);
 
@@ -74,6 +74,7 @@ class _eventoIndividualState extends State<eventoIndividual> {
             _buildEventInfo("Tipo de evento", widget.tipoEvento),
             _buildEventInfo("Fecha", widget.fechaEvento),
             _buildEventInfo("Hora", widget.horaEvento),
+            //BOTON PARA CERRAR EL EVENTO
             Center(
               child: Opacity(
                   opacity: widget.isMine ? 1.0 : 0.0,
@@ -97,6 +98,7 @@ class _eventoIndividualState extends State<eventoIndividual> {
                   )
               ),
             ),
+            // Aquí van las fotos
             // Aquí van las fotos
             Container(
               height: 400,
@@ -137,8 +139,8 @@ class _eventoIndividualState extends State<eventoIndividual> {
                                             children: [
                                               Image.network(URL.data!, fit: BoxFit.contain),
                                               Positioned(
-                                                top: 10,
-                                                right: 10,
+                                                bottom: 0,
+                                                left: 5,
                                                 //Codigo del botón para borrar la foto
                                                 child: Opacity(
                                                   opacity: puedoBorrarFoto(nombreImagen, widget.isMine) ? 1.0 : 0.0,
@@ -176,7 +178,6 @@ class _eventoIndividualState extends State<eventoIndividual> {
                                                                       Storage.eliminarImagen(widget.idEvento, nombreImagen).then((value) {
                                                                         ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text("IMAGEN ELIMINADA.")));
                                                                         setState(() {});
-
                                                                         // Usar la variable dialogContext en lugar de context
                                                                         Navigator.of(dialogContext).pop();
                                                                       });
@@ -200,6 +201,27 @@ class _eventoIndividualState extends State<eventoIndividual> {
                                                   ),
                                                 ),
                                               ),
+                                              Positioned(
+                                                bottom: 0,
+                                                right: 10,
+                                                child: IconButton(
+                                                    onPressed: (){
+                                                      Navigator.of(dialogContext).pop();
+                                                      Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder: (context) => bandejaComentarios(
+                                                            idEvento: widget.idEvento,
+                                                            nombreImagen: nombreImagen,
+                                                            idUsuarioActual: widget.idUsuarioActual,
+                                                            isMine: widget.isMine,
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                    icon: Icon(Icons.comment, color: Colors.white54)
+                                                )
+                                              )
                                             ],
                                           ),
                                         );
@@ -231,9 +253,6 @@ class _eventoIndividualState extends State<eventoIndividual> {
                 },
               ),
             ),
-            //BOTON PARA CERRAR EL EVENTO
-
-
           ],
         ),
       ),
@@ -302,6 +321,7 @@ class _eventoIndividualState extends State<eventoIndividual> {
     }
   }
 
+  //Componente para editar el evento
   void _mostrarFormularioEdicion(BuildContext context) async {
     // Crear controladores para los campos de texto con los valores actuales
     TextEditingController nombreController = TextEditingController(text: widget.nombre);
@@ -415,7 +435,7 @@ class _eventoIndividualState extends State<eventoIndividual> {
     }
   }
 
-// Componente para seleccionar hora en formato de 12 horas
+  // Componente para seleccionar hora en formato de 12 horas
   Future<void> _selectTime(TextEditingController controlador) async {
     // Mostrar el selector de hora
     TimeOfDay? _picked = await showTimePicker(
@@ -441,7 +461,7 @@ class _eventoIndividualState extends State<eventoIndividual> {
     }
   }
 
-// Función para formatear la hora en formato de 12 horas
+  // Función para formatear la hora en formato de 12 horas
   String _formatTime(int hour, int minute) {
     String period = 'AM';
     if (hour >= 12) {

@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gallery_memories/listaInvitados.dart';
 import 'package:gallery_memories/login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gallery_memories/serviciosremotos.dart';
@@ -104,8 +105,8 @@ class _inicioAppState extends State<inicioApp> {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return CircularProgressIndicator();
-                  } else if (snapshot.hasError) {
-                     return Column(
+                  } else if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+                    return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircleAvatar(
@@ -125,8 +126,6 @@ class _inicioAppState extends State<inicioApp> {
                       ],
                     );
                   } else {
-                    print("URL de la imagen de perfil: ${snapshot.data}");
-
                     return Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -377,9 +376,11 @@ class _inicioAppState extends State<inicioApp> {
                                           SizedBox(width: 20,),
                                           IconButton(
                                               onPressed: () {
-                                                mostrarListaInvitados(context, listaJSON.data?[indice]['id'], listaJSON.data?[indice]['nombre']).then((_) {
-                                                  setState(() {}); // Actualiza la interfaz de usuario después de cerrar la lista de invitados
-                                                });
+                                                Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                    builder: (context) => listaInvitados(idEvento: listaJSON.data?[indice]['id'], nombreEvento: listaJSON.data?[indice]['nombre'])
+                                                ));
                                               },
                                               icon: Icon(Icons.checklist_rtl_sharp)
                                           ),
@@ -866,7 +867,10 @@ class _inicioAppState extends State<inicioApp> {
                     actions: [
                       TextButton(
                         onPressed: () async {
-                          //Borrar datos del usuario
+                          //Borrar todos los eventos del usuario
+                          //Borrarse como invitado de todos los eventos en los que se encuentre
+                          //Borrar datos del usuario (tabla usuarios
+                          //La misma función elimina usuario hace todo
                           DB.eliminaUsuario(uid);
                           //Borrar usuario
                           User? user = FirebaseAuth.instance.currentUser;
@@ -880,8 +884,8 @@ class _inicioAppState extends State<inicioApp> {
                                 return login();
                               }),
                             );
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("USUARIO ELIMINADO")));
                           });
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("USUARIO ELIMINADO")));
                         },
                         child: Text("Aceptar"),
                       ),
@@ -1201,6 +1205,4 @@ class _inicioAppState extends State<inicioApp> {
       },
     );
   }
-
-
 }

@@ -34,6 +34,32 @@ class DB{
 
   static Future<void> eliminaUsuario(String uid) async {
     try {
+      //1. Borrar todos los eventos creados por el usuario
+      var eventosCreados = await baseremota.collection('eventos').where('propietario',isEqualTo: uid).get();
+      for(var doc in eventosCreados.docs){
+        await baseremota.collection('eventos').doc(doc.id).delete();
+      }
+
+      // 2. Borrarse como invitado de todos los eventos en los que se encuentre
+      var eventosInvitadoSnapshot = await baseremota.collection('eventos').get();
+      for (var doc in eventosInvitadoSnapshot.docs) {
+        var datosEvento = doc.data() as Map<String, dynamic>;
+        List<dynamic> invitados = datosEvento['invitados'] ?? [];
+        int datosOriginales = datosEvento['invitados'].length;
+
+        // Remover el mapa del invitado con el idInvitado igual a uid
+        print("Antes de eliminar: $invitados");
+        invitados.removeWhere((invitado) => invitado['idInvitado'] == uid);
+        print("Después de eliminar: $invitados");
+
+        // Actualizar la lista de invitados solo si se hizo una modificación
+        if (invitados.length != datosOriginales) {
+          await baseremota.collection('eventos').doc(doc.id).update({'invitados': invitados});
+          print("Actualización realizada en el evento: ${doc.id}");
+        }
+      }
+
+      //3. Eliminar información del usuario (tabla usuarios)
       await baseremota.collection('usuarios').doc(uid).delete();
     } catch (e) {
       print('Error al eliminar el usuario: $e');
@@ -442,6 +468,51 @@ class DB{
       print('Error al actualizar el acceso del invitado: $e');
       throw e;
     }
+  }
+
+  static Future<List<Map<String, dynamic>>> obtenerComentarios(String idEvento, String nombreImagen) async {
+    var snapshot = await FirebaseFirestore.instance
+        .collection('comentarios')
+        .doc(idEvento)
+        .collection('imagenes')
+        .doc(nombreImagen)
+        .collection('comments')
+        .get();
+
+    List<Map<String, dynamic>> comentarios = [];
+
+    for (var doc in snapshot.docs) {
+      var data = doc.data();
+      var usuarioSnapshot = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(data['usuario'])
+          .get();
+
+      if (usuarioSnapshot.exists) {
+        var usuarioData = usuarioSnapshot.data();
+        data['nombreUsuario'] = usuarioData?['nombre'] ?? 'Usuario desconocido';
+      } else {
+        data['nombreUsuario'] = 'Usuario desconocido';
+      }
+
+      comentarios.add(data);
+    }
+
+    return comentarios;
+  }
+
+  static Future<void> agregarComentario(String idEvento, String nombreImagen, String comentario, String usuario) async {
+    await FirebaseFirestore.instance
+        .collection('comentarios')
+        .doc(idEvento)
+        .collection('imagenes')
+        .doc(nombreImagen)
+        .collection('comments')
+        .add({
+      'comentario': comentario,
+      'usuario': usuario,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
   }
 }
 
