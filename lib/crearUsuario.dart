@@ -30,12 +30,11 @@ class _crearusuarioState extends State<crearusuario> {
   void _handleSingUp(BuildContext context) async {
     try {
       // ? NOE Verificar si el correo ya existe en la base de datos
+      print("Verificando si $email exsite en la BD");
       bool emailExists = await DB.checkEmailExists(email);
       if (emailExists) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("El correo ya está registrado."),
-          ),
+          SnackBar(content: Text("El correo ya está registrado."),),
         );
         return;
       }
@@ -61,24 +60,15 @@ class _crearusuarioState extends State<crearusuario> {
       await _sendWelcomeEmail(email, nombre);
 
       // Muestra un SnackBar con el correo del usuario registrado
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Usuario registrado con ID: $idUsuario"),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Usuario registrado con ID: $idUsuario"),),);
 
       // Después de mostrar el SnackBar, navega a la interfaz de inicio de sesión
-      Navigator.pushReplacement(
-        context,
+      Navigator.pushReplacement(context,
         MaterialPageRoute(builder: (context) => login()),
       );
     } catch (e) {
       // Si hay un error durante el registro, muestra un SnackBar con el mensaje de error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error al registrar usuario: $e"),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(         content: Text("Error al registrar usuario: $e"),),);
     }
   }
 
@@ -177,9 +167,7 @@ class _crearusuarioState extends State<crearusuario> {
                               color: Colors.white,
                               fontFamily: 'BebasNeue'),
                         ),
-                        SizedBox(
-                          height: 10,
-                        ),
+                        SizedBox(height: 10,),
                         TextFormField(
                           controller: _username,
                           keyboardType: TextInputType.text,
@@ -200,9 +188,7 @@ class _crearusuarioState extends State<crearusuario> {
                             });
                           },
                         ),
-                        SizedBox(
-                          height: 20,
-                        ),
+                        SizedBox(height: 20,),
                         TextFormField(
                           controller: _emailCont,
                           keyboardType: TextInputType.text,
@@ -210,7 +196,8 @@ class _crearusuarioState extends State<crearusuario> {
                               border: OutlineInputBorder(),
                               labelText: "Email",
                               floatingLabelBehavior:
-                                  FloatingLabelBehavior.always),
+                                  FloatingLabelBehavior.always
+                          ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return "Ingrese un correo";

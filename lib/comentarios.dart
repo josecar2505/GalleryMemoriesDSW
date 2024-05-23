@@ -16,8 +16,7 @@ class _BandejaComentariosState extends State<bandejaComentarios> {
   final TextEditingController _commentController = TextEditingController();
   bool _isLoading = true;
   bool _filtrarMisComentarios = false;
-
-
+  bool _filtrarSoloMisComentarios = false;
 
   @override
   void initState() {
@@ -25,27 +24,33 @@ class _BandejaComentariosState extends State<bandejaComentarios> {
     _cargarComentarios();
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text("Comentarios"),
         actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'Mis comentarios primero') {
-                _toggleFiltroMisComentarios();
-              }
-            },
-            itemBuilder: (BuildContext context) {
-              return {'Mis comentarios primero'}.map((String choice) {
-                return PopupMenuItem<String>(
-                  value: choice,
-                  child: Text(choice),
-                );
-              }).toList();
-            },
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child:
+              PopupMenuButton<String>(
+                child: Icon(Icons.filter_alt_rounded),
+                onSelected: (value) {
+                  if (value == 'Mis comentarios primero') {
+                    _toggleFiltroMisComentarios();
+                  }else if (value == 'Solo mis comentarios'){
+                    _toggleFiltroSoloMisComentarios();
+                  }
+                },
+                itemBuilder: (BuildContext context) {
+                  return {'Mis comentarios primero', 'Solo mis comentarios'}.map((String choice) {
+                    return PopupMenuItem<String>(
+                      value: choice,
+                      child: Text(choice),
+                    );
+                  }).toList();
+                },
+              ),
           ),
         ],
       ),
@@ -57,38 +62,39 @@ class _BandejaComentariosState extends State<bandejaComentarios> {
                 : _comentarios.isEmpty
                 ? Center(child: Text('Aún no hay comentarios'))
                 : ListView.builder(
-              itemCount: _comentarios.length,
-              itemBuilder: (context, index) {
-                var comentario = _comentarios[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                  child: Card(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                    elevation: 2.0,
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            comentario['nombreUsuario'],
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                    itemCount: _comentarios.length,
+                    itemBuilder: (context, index) {
+                      var comentario = _comentarios[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                        child: Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.0),
                           ),
-                          SizedBox(height: 5),
-                          Text(comentario['comentario']),
-                          SizedBox(height: 5),
-                          Text(
-                            '${_formatearFecha(comentario['timestamp'])}',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          elevation: 2.0,
+                          child: ListTile(
+                            title: Text(
+                              comentario['nombreUsuario'],
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(comentario['comentario']),
+                                SizedBox(height: 5),
+                                Text(
+                                  '${_formatearFecha(comentario['timestamp'])}',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                            trailing: (widget.isMine || comentario['usuario'] == widget.idUsuarioActual)
+                                ? _buildPopupMenuButton(comentario)
+                                : null,
                           ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
+                        ),
+                      );
+                    },
             ),
           ),
           Padding(
@@ -125,6 +131,32 @@ class _BandejaComentariosState extends State<bandejaComentarios> {
     );
   }
 
+  Widget _buildPopupMenuButton(Map<String, dynamic> comentario) {
+    return PopupMenuButton<String>(
+      onSelected: (value) {
+        if (value == 'Editar') {
+          _editarComentario(comentario);
+        } else if (value == 'Eliminar') {
+          _eliminarComentario(comentario['id']);
+        }
+      },
+      itemBuilder: (BuildContext context) {
+        return <PopupMenuEntry<String>>[
+          if (comentario['usuario'] == widget.idUsuarioActual)
+            PopupMenuItem<String>(
+              value: 'Editar',
+              child: Text('Editar'),
+            ),
+          if (widget.isMine || comentario['usuario'] == widget.idUsuarioActual)
+            PopupMenuItem<String>(
+              value: 'Eliminar',
+              child: Text('Eliminar'),
+            ),
+        ];
+      },
+    );
+  }
+
   Future<void> _cargarComentarios() async {
     try {
       var comentarios = await DB.obtenerComentarios(widget.idEvento, widget.nombreImagen);
@@ -148,6 +180,47 @@ class _BandejaComentariosState extends State<bandejaComentarios> {
     }
   }
 
+  Future<void> _eliminarComentario(String idComentario) async {
+    print(idComentario);
+    await DB.eliminarComentario(widget.idEvento, widget.nombreImagen, idComentario);
+    _cargarComentarios();
+  }
+
+  Future<void> _editarComentario(Map<String, dynamic> comentario) async {
+    TextEditingController _editController = TextEditingController(text: comentario['comentario']);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Editar Comentario"),
+          content: TextField(
+            controller: _editController,
+            decoration: InputDecoration(hintText: "Editar comentario"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                if (_editController.text.isNotEmpty) {
+                  await DB.editarComentario(widget.idEvento, widget.nombreImagen, comentario['id'], _editController.text);
+                  _cargarComentarios();
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Text("Guardar"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text("Cancelar"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   DateTime _formatearFecha(Timestamp timestamp) {
     var date = timestamp.toDate();
     return date;
@@ -168,6 +241,19 @@ class _BandejaComentariosState extends State<bandejaComentarios> {
           }
           return 0; // Mantener el orden original para otros comentarios
         });
+      });
+    } else {
+      // Si el filtro está desactivado, vuelve a cargar los comentarios originales
+      _cargarComentarios();
+    }
+  }
+
+  void _toggleFiltroSoloMisComentarios() async {
+    _filtrarSoloMisComentarios = !_filtrarSoloMisComentarios;
+    print("Filtrar solo mis comentarios: $_filtrarSoloMisComentarios");
+    if (_filtrarSoloMisComentarios) {
+      setState(() {
+        _comentarios = _comentarios.where((comentario) => comentario['usuario'] == widget.idUsuarioActual).toList();
       });
     } else {
       // Si el filtro está desactivado, vuelve a cargar los comentarios originales

@@ -10,12 +10,8 @@ var carpetaRemota = FirebaseStorage.instance;
 
 class DB {
   static Future<List<String>> recuperarDatos(String uid) async {
-    var query = await baseremota
-        .collection("usuarios")
-        .where('idUsuario', isEqualTo: uid)
-        .get();
-    List<String> temporal =
-        List.filled(2, ''); // Inicializa la lista con dos elementos vacíos.
+    var query = await baseremota.collection("usuarios").where('idUsuario', isEqualTo: uid).get();
+    List<String> temporal =List.filled(2, ''); // Inicializa la lista con dos elementos vacíos.
 
     query.docs.forEach((element) {
       Map<String, dynamic> mapa = element.data();
@@ -216,8 +212,7 @@ class DB {
     }
   }
 
-  static Future<void> eliminarInvitado(
-      String idEvento, String idInvitado) async {
+  static Future<void> eliminarInvitado(String idEvento, String idInvitado) async {
     try {
       // Obtener el documento actual
       DocumentSnapshot eventoSnapshot =
@@ -289,8 +284,7 @@ class DB {
     }
   }
 
-  static Future<Map<String, dynamic>> obtenerDatosEvento(
-      String idEvento) async {
+  static Future<Map<String, dynamic>> obtenerDatosEvento(String idEvento) async {
     try {
       // Obtener el documento del evento desde Firebase usando el ID del evento
       var documentoEvento =
@@ -385,8 +379,7 @@ class DB {
     }
   }
 
-  static Future<void> actualizarDatosUsuario(
-      String uid, String nuevoNombre, String nuevoNickname) async {
+  static Future<void> actualizarDatosUsuario(String uid, String nuevoNombre, String nuevoNickname) async {
     try {
       var query = await baseremota
           .collection("usuarios")
@@ -410,8 +403,7 @@ class DB {
     }
   }
 
-  static Future<void> actualizarEvento(
-      eventoId, String nombre, String tipo, String fecha, String hora) async {
+  static Future<void> actualizarEvento(eventoId, String nombre, String tipo, String fecha, String hora) async {
     try {
       var query = await baseremota.collection("eventos").doc(eventoId).get();
 
@@ -490,8 +482,7 @@ class DB {
     }
   }
 
-  static Future<void> actualizarAccesoInvitado(
-      String idEvento, String idInvitado, bool nuevoAcceso) async {
+  static Future<void> actualizarAccesoInvitado(String idEvento, String idInvitado, bool nuevoAcceso) async {
     try {
       // Obtener la referencia al documento del evento en la base de datos
       var eventoDoc = baseremota.collection('eventos').doc(idEvento);
@@ -529,9 +520,8 @@ class DB {
       throw e;
     }
   }
-
-  static Future<List<Map<String, dynamic>>> obtenerComentarios(
-      String idEvento, String nombreImagen) async {
+  //CRUD COMENTARIOS
+  static Future<List<Map<String, dynamic>>> obtenerComentarios(String idEvento, String nombreImagen) async {
     var snapshot = await FirebaseFirestore.instance
         .collection('comentarios')
         .doc(idEvento)
@@ -544,6 +534,7 @@ class DB {
 
     for (var doc in snapshot.docs) {
       var data = doc.data();
+      data['id'] = doc.id;
       var usuarioSnapshot = await FirebaseFirestore.instance
           .collection('usuarios')
           .doc(data['usuario'])
@@ -562,8 +553,7 @@ class DB {
     return comentarios;
   }
 
-  static Future<void> agregarComentario(String idEvento, String nombreImagen,
-      String comentario, String usuario) async {
+  static Future<void> agregarComentario(String idEvento, String nombreImagen, String comentario, String usuario) async {
     await FirebaseFirestore.instance
         .collection('comentarios')
         .doc(idEvento)
@@ -577,6 +567,31 @@ class DB {
     });
   }
 
+  static Future<void> eliminarComentario(String idEvento, String nombreImagen, String idComentario) async {
+    try {
+      DocumentReference eventoRef = baseremota.collection('comentarios').doc(idEvento);
+      DocumentReference imagenRef = eventoRef.collection('imagenes').doc(nombreImagen);
+
+      await imagenRef.collection('comments').doc(idComentario).delete();
+    } catch (e) {
+      print(e);
+    }
+  }
+
+  static Future<void> editarComentario(String idEvento, String nombreImagen, String idComentario, String nuevoComentario) async {
+    try {
+      DocumentReference eventoRef = baseremota.collection('comentarios').doc(idEvento);
+      DocumentReference imagenRef = eventoRef.collection('imagenes').doc(nombreImagen);
+
+      await imagenRef.collection('comments').doc(idComentario).update({
+        'comentario': nuevoComentario,
+        'timestamp': FieldValue.serverTimestamp()
+      });
+    } catch (e) {
+      print(e);
+    }
+  }
+
   // ? NOE Método para verificar si un correo electrónico ya está registrado
   static Future<bool> checkEmailExists(String email) async {
     var query = await baseremota
@@ -588,8 +603,7 @@ class DB {
 }
 
 class Storage {
-  static Future<String?> obtenerPrimeraImagenDeAlbum(
-      String nombreCarpeta) async {
+  static Future<String?> obtenerPrimeraImagenDeAlbum(String nombreCarpeta) async {
     try {
       // Obtén la lista de elementos en la carpeta (imágenes)
       ListResult result = await carpetaRemota.ref(nombreCarpeta).list();
@@ -610,8 +624,7 @@ class Storage {
     }
   }
 
-  static Future<String?> obtenerFotoPerfil(
-      String nombreCarpeta, String nombre) async {
+  static Future<String?> obtenerFotoPerfil(String nombreCarpeta, String nombre) async {
     try {
       // Obtén la referencia del archivo de la imagen
       print("Buscando en $nombreCarpeta/$nombre");
@@ -635,8 +648,7 @@ class Storage {
     }
   }
 
-  static Future subirFoto(
-      String path, String nombreImagen, String nombreCarpeta) async {
+  static Future subirFoto(String path, String nombreImagen, String nombreCarpeta) async {
     var file = File(path);
 
     return await carpetaRemota
@@ -644,8 +656,7 @@ class Storage {
         .putFile(file);
   }
 
-  static Future<String?> obtenerURLimagen(
-      String nombreCarpeta, String nombre) async {
+  static Future<String?> obtenerURLimagen(String nombreCarpeta, String nombre) async {
     try {
       return await carpetaRemota.ref("$nombreCarpeta/$nombre").getDownloadURL();
     } catch (error) {
@@ -660,8 +671,7 @@ class Storage {
     return await carpetaRemota.ref(carpeta).listAll();
   }
 
-  static Future<void> eliminarImagen(
-      String nombreCarpeta, String nombreImagen) async {
+  static Future<void> eliminarImagen(String nombreCarpeta, String nombreImagen) async {
     try {
       // Obtener la referencia del archivo a eliminar
       var referenciaArchivo = carpetaRemota.ref("$nombreCarpeta/$nombreImagen");
