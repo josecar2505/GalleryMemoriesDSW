@@ -29,7 +29,7 @@ class _crearusuarioState extends State<crearusuario> {
   // Función para manejar el registro de usuario
   void _handleSingUp(BuildContext context) async {
     try {
-      // Verificar si el correo ya existe en la base de datos
+      // ? NOE Verificar si el correo ya existe en la base de datos
       bool emailExists = await DB.checkEmailExists(email);
       if (emailExists) {
         ScaffoldMessenger.of(context).showSnackBar(
