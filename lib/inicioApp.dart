@@ -379,7 +379,7 @@ class _inicioAppState extends State<inicioApp> {
                                                 Navigator.push(
                                                     context,
                                                     MaterialPageRoute(
-                                                    builder: (context) => listaInvitados(idEvento: listaJSON.data?[indice]['id'], nombreEvento: listaJSON.data?[indice]['nombre'])
+                                                    builder: (context) => listaInvitados(idEvento: listaJSON.data?[indice]['id'], nombreEvento: listaJSON.data?[indice]['nombre'],idUsuario: uid)
                                                 ));
                                               },
                                               icon: Icon(Icons.checklist_rtl_sharp)
