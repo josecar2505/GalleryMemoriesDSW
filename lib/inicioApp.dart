@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gallery_memories/listaInvitados.dart';
+import 'package:gallery_memories/listaAmigos.dart';
 import 'package:gallery_memories/login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gallery_memories/serviciosremotos.dart';
@@ -39,11 +40,15 @@ class _inicioAppState extends State<inicioApp> {
   //Controllers para cambiar los datos del usuario
   final username = TextEditingController();
   final nickname = TextEditingController();
-
+  //Controllers para consultar usuario
+  final numUsuario = TextEditingController();
 
   //Variables para consultar un evento como invitado
   String auxProp = "", auxFecha= "", auxHora = "", auxNombre = "", auxTipo = "";
+  String auxNickname = "", auxNombreU = "", auxCorreo = "";
 
+  //Variable para seber si es tu amigo
+  bool amigoV = false;
 
   @override
   void setUser() async {
@@ -160,9 +165,10 @@ class _inicioAppState extends State<inicioApp> {
             _item(Icons.mode_of_travel_outlined, "MIS INVITACIONES", 1),
             _item(Icons.add, "AGREGAR EVENTO", 2),
             _item(Icons.create_new_folder, "CREAR EVENTO", 3),
-            _item(Icons.settings, "CONFIGURACIÓN", 4),
-            _item(Icons.supervised_user_circle, "MI PERFIL", 5),
-            _item(Icons.exit_to_app, "SALIR", 6),
+            _item(Icons.person, "AMIGOS", 4),
+            _item(Icons.settings, "CONFIGURACIÓN", 5),
+            _item(Icons.supervised_user_circle, "MI PERFIL", 6),
+            _item(Icons.exit_to_app, "SALIR", 7),
           ],
         ),
       )
@@ -200,10 +206,12 @@ class _inicioAppState extends State<inicioApp> {
      case 3:
        return crearEvento();
      case 4:
-       return configuracion();
+       return amigos();
      case 5:
+       return configuracion();
+     case 6:
        return miPerfil();
-     case 6 :
+     case 7 :
        //Navegar a la pantalla del login (cerrar sesión)
        Future.delayed(Duration.zero, () {
          Navigator.pushReplacement(
@@ -390,7 +398,6 @@ class _inicioAppState extends State<inicioApp> {
                                               onPressed: (){
                                                 void enviarMensajeWhatsApp() async {
                                                   String mensaje = Uri.encodeFull("${listaJSON.data?[indice]['id']}");
-                                                  String telefono = '3221712894'; // Reemplaza esto con el número de teléfono al que deseas enviar el mensaje
                                                   String url = 'https://wa.me/?text=$mensaje';
 
                                                   if (await canLaunch(url)) {
@@ -831,6 +838,262 @@ class _inicioAppState extends State<inicioApp> {
                 child: Text("Cancelar")),
           ],
         )
+      ],
+    );
+  }
+
+  Widget amigos(){
+    return ListView(
+      padding: EdgeInsets.all(40),
+      children: [
+        Center(
+          child: Text(
+            "AGREGAR AMIGO",
+            style: TextStyle(
+              fontSize: 25,
+              color: Colors.green,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        SizedBox(height: 20),
+        TextField(
+          controller: numUsuario,
+          decoration: InputDecoration(
+            labelText: "CÓDIGO DE USUARIO:",
+            border: OutlineInputBorder(),
+            floatingLabelBehavior: FloatingLabelBehavior.always,
+            suffixIcon: Icon(Icons.person_search_sharp),
+          ),
+        ),
+        SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: () async {
+            amigoV = false;
+            try {
+              if(numUsuario.text.isEmpty){
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Para consultar un usuario es necesario ingresar el código de usuario")));
+              }else{
+                List<dynamic> jsonTemporal = await DB.buscarUsuario(numUsuario.text);
+                List<dynamic> amigos = await DB.Amigos(uid);
+
+                await DB.buscarUsuarioB(numUsuario.text).then((value){
+                  value ? ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Usuario encontrado"))) : ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Usuario no encontrado")));
+                });
+                amigos.forEach((amigo) {
+                  if(amigo.containsValue(numUsuario.text)){
+                    amigoV = true;
+                  }
+                });
+
+                if(uid == numUsuario.text){
+                  amigoV = true;
+                }
+
+                setState(() {
+                  auxNickname = "Nickname: ${jsonTemporal[0]['nickname']}";
+                  auxNombreU = "Nombre: ${jsonTemporal[0]['nombre']}";
+                  auxCorreo = "Correo: ${jsonTemporal[0]['email']}";
+                });
+              }
+            } catch (error) {
+              print("Error al buscar usuario: $error");
+              // Puedes mostrar un mensaje de error al usuario si es necesario
+            }
+          },
+          child: Text("CONSULTAR USUARIO"),
+        ),
+        SizedBox(height: 20),
+        Container(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("${auxNickname}", style: TextStyle(fontFamily: 'Oswald', fontSize: 17, color: amigoV ? Colors.green : Colors.black87)),
+              SizedBox(height: 8.0),
+              Text("$auxNombreU", style: TextStyle(fontFamily: 'Oswald', fontSize: 17, color: amigoV ? Colors.green : Colors.black87)),
+              SizedBox(height: 8.0),
+              Text("$auxCorreo", style: TextStyle(fontFamily: 'Oswald', fontSize: 17, color: amigoV ? Colors.green : Colors.black87)),
+              ],
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            try {
+              if(numUsuario.text.isEmpty){
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Para agregar un amigo es necesario ingresar el código de usuario")));
+              }else{
+                bool invitadoAgregado = await DB.agregarAmigo(uid, numUsuario.text);
+                if(uid == numUsuario.text){
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No puedes agregarte como amigo")));
+                  setState(() {
+                    _index = 4;
+                  });
+                }else if (invitadoAgregado) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Usuario "+auxNickname+" agregado como amigo")));
+                  setState(() {
+                    _index = 4;
+                  });
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Solo puedes añadir como amigo a usuarios que todavia no los tengas agregados")));
+                  setState(() {
+                    _index = 4;
+                  });
+                }
+              }
+              setState(() {
+                numUsuario.text = "";
+                auxNickname = "";
+                auxNombreU = "";
+                auxCorreo = "";
+                amigoV = false;
+              });
+            } catch (error) {
+              print("Error al agregar el usuario: $error");
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error al agregar el usuario como amigo. Por favor, inténtalo de nuevo más tarde.")));
+            }
+          },
+          child: Text("AGREGAR"),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            //BOTON PARA COPIAR CÓDIGO DE USUARIO
+            IconButton(
+                onPressed: (){
+                  Clipboard.setData(
+                    ClipboardData(
+                      text: uid,
+                    ),
+                  );
+                },
+                icon: Icon(Icons.copy, color: Colors.black87,)
+            ),
+            //BOTÓN PARA ELIMINAR AL USUARIO DE AMIGO
+            SizedBox(width: 20,),
+            IconButton(
+                onPressed: (){
+                  if(numUsuario.text.isEmpty){
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Para eliminar un amigo es necesario ingresar el código de usuario")));
+                  }else{
+                    if(numUsuario.text == uid){
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No puedes eliminarte de tus amigos")));
+                    }else {
+                      showDialog(
+                          context: context,
+                          builder: (context){
+                            return AlertDialog(
+                              title: Center(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.warning_amber_outlined, color: Colors.red),
+                                    SizedBox(width: 8),
+                                    Text("Eliminación de amigo.", style: TextStyle(color: Colors.red)),
+                                  ],
+                                ),
+                              ),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    "¿Está seguro de eliminar este usuario de tu lista de amigos?",
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () async {
+                                    List<dynamic> amigos = await DB.Amigos(uid);
+
+                                    if(!amigos.any((amigo) => amigo['amigos'] == numUsuario.text)){
+                                      Navigator.of(context).pop();
+                                      setState(() {
+                                        _index = 4;
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No puedes eliminar a alguien que no tengas agregado como amigo")));
+                                    }else if(uid == numUsuario.text){
+                                      Navigator.of(context).pop();
+                                      setState(() {
+                                        _index = 4;
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No puedes eliminarte de tu lista de amigos")));
+                                    }else{
+                                      DB.eliminarAmigo(uid,numUsuario.text);
+                                      //Borrar usuario de amigos
+                                      Navigator.of(context).pop();
+                                      setState(() {
+                                        _index = 4;
+                                      });
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Usuario "+auxNickname+" eliminado de mi lista de amigos")));
+                                    }
+                                    setState(() {
+                                      numUsuario.text = "";
+                                      auxNickname = "";
+                                      auxNombreU = "";
+                                      auxCorreo = "";
+                                      amigoV = false;
+                                    });
+                                  },
+                                  child: Text("Aceptar"),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    // Usar la variable dialogContext en lugar de context
+                                    Navigator.of(context).pop();
+                                  },
+                                  child: Text("Cancelar"),
+                                ),
+                              ],
+                            );
+                          }
+                      );
+                    }
+                  }
+                },
+                icon: Icon(Icons.person_remove_sharp, color: Colors.red,)
+            ),
+            SizedBox(width: 20,),
+            //BOTÓN PARA COMPARTIR TU CODIGO USUARIO
+            IconButton(
+                onPressed: () {
+                  void enviarMensajeWhatsApp() async {
+                    String mensaje = Uri.encodeFull(uid);
+                    String telefono = '3221712894'; // Reemplaza esto con el número de teléfono al que deseas enviar el mensaje
+                    String url = 'https://wa.me/?text=$mensaje';
+
+                    if (await canLaunch(url)) {
+                      await launch(url);
+                    } else {
+                      throw 'No se pudo abrir WhatsApp.';
+                    }
+                  }
+                  enviarMensajeWhatsApp();
+                },
+                icon: Icon(Icons.share, color: Colors.black87,)
+            ),
+            SizedBox(width: 20,),
+            //BOTÓN PARA VER CHATS CON AMIGOS
+            IconButton(
+                onPressed: (){
+
+                },
+                icon: Icon(Icons.chat, color: Colors.black87,)
+            ),
+          ],
+        ),
+        SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => listaAmigos(idUsuario:uid)
+                ));
+          },
+          child: Text("CONSULTAR AMIGOS"),
+        ),
       ],
     );
   }

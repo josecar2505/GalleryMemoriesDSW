@@ -604,53 +604,56 @@ class DB {
   // Jesus Sobre los Amigos
   static Future<bool> agregarAmigo(String idUsuario, String idInvitado) async {
     try{
-      // Obtener la referencia al documento del usuario en la base de datos
-      var usuarioDoc = baseremota.collection('usuarios').doc(idUsuario);
-      var invitadoDoc = baseremota.collection('usuarios').doc(idInvitado);
+      if(idUsuario == idInvitado){
+        print('No es posible aregarse uno mismo como amigo');
+        return false;
+      }else{
+        // Obtener la referencia al documento del usuario en la base de datos
+        var usuarioDoc = baseremota.collection('usuarios').doc(idUsuario);
+        var invitadoDoc = baseremota.collection('usuarios').doc(idInvitado);
 
-      // Obtener los datos del documento
-      var usuarioSnapshot = await usuarioDoc.get();
-      var invitadoSnapshot = await invitadoDoc.get();
+        // Obtener los datos del documento
+        var usuarioSnapshot = await usuarioDoc.get();
+        var invitadoSnapshot = await invitadoDoc.get();
 
-      // Verificar si el documento existe y contiene datos
-      if (usuarioSnapshot.exists && invitadoSnapshot.exists) {
+        // Verificar si el documento existe y contiene datos
+        if (usuarioSnapshot.exists && invitadoSnapshot.exists) {
 
-        // Verificar si el documento existe antes de acceder a sus datos
-        Map<String, dynamic>? usuarioData = usuarioSnapshot.data();
-        Map<String, dynamic>? invitadoData = invitadoSnapshot.data();
+          // Verificar si el documento existe antes de acceder a sus datos
+          Map<String, dynamic>? usuarioData = usuarioSnapshot.data();
+          Map<String, dynamic>? invitadoData = invitadoSnapshot.data();
 
-        if (usuarioData != null && invitadoData != null) {
+          if (usuarioData != null && invitadoData != null) {
 
-          List<dynamic> amigosList = usuarioData['amigos'] ?? [];
-          List<dynamic> invitadosList = invitadoData['amigos'] ?? [];
+            List<dynamic> amigosList = usuarioData['amigos'] ?? [];
+            List<dynamic> invitadosList = invitadoData['amigos'] ?? [];
 
-          if (!amigosList.any((amigo) => amigo['amigos'] == idInvitado) && !invitadosList.any((amigo) => amigo['amigos'] == idUsuario)) {
-            // Guardar los cambios en Firestore de amigo agregado
-            amigosList.add({'amigos': idInvitado});
-            invitadosList.add({'amigos': idUsuario});
-            await usuarioDoc.update({'amigos': amigosList});
-            await invitadoDoc.update({'amigos': invitadosList});
-            print(('El usuario ha sido agregado como amigo'));
-            return true;
+            if (!amigosList.any((amigo) => amigo['amigos'] == idInvitado) && !invitadosList.any((amigo) => amigo['amigos'] == idUsuario)) {
+              // Guardar los cambios en Firestore de amigo agregado
+              amigosList.add({'amigos': idInvitado});
+              invitadosList.add({'amigos': idUsuario});
+              await usuarioDoc.update({'amigos': amigosList});
+              await invitadoDoc.update({'amigos': invitadosList});
+              print(('El usuario ha sido agregado como amigo'));
+              return true;
+            }else{
+              print(('El usuario que intentas agregar ya lo tienes como amigo'));
+              return false;
+            }
           }else{
-            print(('El usuario que intentas agregar ya lo tienes como amigo'));
+            print('El documento del usuario no existe');
             return false;
           }
         }else{
           print('El documento del usuario no existe');
           return false;
         }
-      }else{
-        print('El documento del usuario no existe');
-        return false;
       }
-
     }catch (e) {
       // Manejar el error si ocurre al actualizar los datos en la base de datos
       print('Error al agregar al uuario de amigo: $e');
       return false;
     }
-
   }
 
   static Future<List<dynamic>> Amigos(String idUsuario) async {
@@ -670,7 +673,6 @@ class DB {
         if (usuarioData != null) {
 
           List<dynamic> amigosList = usuarioData['amigos'] ?? [];
-
           return amigosList;
         }else{
           return [];
@@ -686,6 +688,136 @@ class DB {
     }
   }
 
+  static Future<List> buscarUsuario(String idUsuario) async {
+    List temp = [];
+
+    try {
+      var documento =
+      await baseremota.collection("usuarios").doc(idUsuario).get();
+
+      if (documento.exists) {
+        // El documento existe, puedes acceder a sus datos
+        var datos = documento.data(); //Datos de la colección "eventos"
+
+        //Obtener datos del usuario
+        var nickname = datos?['nickname'];
+        var nombre = datos?['nombre'];
+        var email = datos?['email'];
+
+        print("Datos del documento con ID $idUsuario: $datos");
+
+        temp.add(datos);
+      } else {
+        // El documento no existe
+        print("No se encontró ningún documento con el ID $idUsuario");
+      }
+    } catch (e) {
+      // Manejar el error según sea necesario
+      print("Error al obtener el documento: $e");
+    }
+
+    return temp;
+  }
+
+  static Future<bool> buscarUsuarioB(String idUsuario) async {
+    try {
+      var documento =
+      await baseremota.collection("usuarios").doc(idUsuario).get();
+
+      if (documento.exists) {
+        print("Usuario encontrado");
+        return true;
+      } else {
+        print("Usuario no encontrado");
+        return false;
+      }
+    } catch (e) {
+      // Manejar el error según sea necesario
+      print("Error al obtener el documento: $e");
+      return false;
+    }
+  }
+
+  static Future<void> eliminarAmigo(String idUsuario, String idAmigo) async {
+    try {
+      // Obtener el documento actual
+      DocumentSnapshot usuarioSnapshot =
+      await baseremota.collection('usuarios').doc(idUsuario).get();
+      DocumentSnapshot amigoSnapshot =
+      await baseremota.collection('usuarios').doc(idAmigo).get();
+
+      if (usuarioSnapshot.exists && amigoSnapshot.exists) {
+        // Obtener los datos actuales del usuario
+        Map<String, dynamic> datosUsuario =
+        usuarioSnapshot.data() as Map<String, dynamic>;
+        Map<String, dynamic> datosAmigo =
+        amigoSnapshot.data() as Map<String, dynamic>;
+
+        // Obtener la lista de amigos
+        List<dynamic> amigos = datosUsuario['amigos'] ?? [];
+        List<dynamic> amigosA = datosAmigo['amigos'] ?? [];
+
+        // Eliminar el usuario de la lista de amigos
+        amigos
+            .removeWhere((amigo) => amigo['amigos'] == idAmigo);
+        amigosA
+            .removeWhere((amigo) => amigo['amigos'] == idUsuario);
+
+        // Actualizar el campo 'amigos' en Firestore
+        await baseremota
+            .collection('usuarios')
+            .doc(idUsuario)
+            .update({'amigos': amigos});
+        await baseremota
+            .collection('usuarios')
+            .doc(idAmigo)
+            .update({'amigos': amigosA});
+
+
+        print('Usuario eliminado de amigo correctamente.');
+      } else {
+        print('El Usuario con ID $idUsuario no existe.');
+      }
+    } catch (error) {
+      print('Error al eliminar el amigo: $error');
+    }
+  }
+
+  static Future<Map<String, dynamic>> obtenerDatosUsuario(String idUsuario) async {
+    try {
+      // Obtener la referencia al documento de usuarios en Firebase
+      DocumentSnapshot<Map<String, dynamic>> usuarioSnapshot =
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(idUsuario)
+          .get();
+
+      // Verificar si el documento existe y tiene datos
+      if (usuarioSnapshot.exists) {
+
+        String idUsuario = usuarioSnapshot.data()?['idUsuario'];
+        String nickname = usuarioSnapshot.data()?['nickname'];
+        String nombre = usuarioSnapshot.data()?['nombre'];
+        String correo = usuarioSnapshot.data()?['email'];
+
+        Map<String, dynamic> usuario = {
+          'idUsuario': idUsuario,
+          'nickname': nickname,
+          'nombre': nombre,
+          'correo' : correo,
+        };
+
+        return usuario;
+      } else {
+        // Devolver una lista vacía si el documento no existe
+        return {};
+      }
+    } catch (e) {
+      // Manejar el error si ocurre al obtener los datos de Firebase
+      print('Error al obtener la lista de invitados: $e');
+      return {};
+    }
+  }
 }
 
 class Storage {
