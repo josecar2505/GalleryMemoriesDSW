@@ -16,6 +16,8 @@ class eventoIndividual extends StatefulWidget {
 class _eventoIndividualState extends State<eventoIndividual> {
   String bar = "EVENTO";
   String estatusEvento = "";
+  bool filtrandoMisFotos = false;
+  Color colorBotonFiltro = Colors.black26;
   void setStatus() async {
     bool? estado = await DB.obtenerEstado(widget.idEvento);
 
@@ -75,30 +77,48 @@ class _eventoIndividualState extends State<eventoIndividual> {
             _buildEventInfo("Fecha", widget.fechaEvento),
             _buildEventInfo("Hora", widget.horaEvento),
             //BOTON PARA CERRAR EL EVENTO
-            Center(
-              child: Opacity(
-                  opacity: widget.isMine ? 1.0 : 0.0,
-                  child: IgnorePointer(ignoring: !widget.isMine,
-                    child: TextButton(
-                      onPressed: () {
-                        DB.cambiarEstado(widget.idEvento).then((value) {
-                          setState(() async {
-                            bool? estado = await DB.obtenerEstado(widget.idEvento);
-                            if (estado == true) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("EVENTO ABIERTO")));
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("EVENTO CERRADO")));
-                            }
-                            setStatus();
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Opacity(
+                    opacity: widget.isMine ? 1.0 : 0.0,
+                    child: IgnorePointer(ignoring: !widget.isMine,
+                      child: TextButton(
+                        onPressed: () {
+                          DB.cambiarEstado(widget.idEvento).then((value) {
+                            setState(() async {
+                              bool? estado = await DB.obtenerEstado(widget.idEvento);
+                              if (estado == true) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("EVENTO ABIERTO")));
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("EVENTO CERRADO")));
+                              }
+                              setStatus();
+                            });
                           });
-                        });
-                      },
-                      child: Text(estatusEvento),
-                    ),
-                  )
-              ),
+                        },
+                        child: Text(estatusEvento),
+                      ),
+                    )
+                ),
+                IconButton(
+                    onPressed: (){
+                      setState(() {
+                        filtrandoMisFotos = !filtrandoMisFotos;
+                        filtrandoMisFotos ? colorBotonFiltro = Colors.lightBlue : colorBotonFiltro = Colors.black26;
+                      });
+
+                      if(filtrandoMisFotos){
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Mostrando sólo mis fotos..."), backgroundColor: Colors.green,));
+                      }else{
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Mostrando TODAS las fotos..."), backgroundColor: Colors.green));
+                      }
+                    },
+                    icon: Icon(Icons.filter_alt, color: colorBotonFiltro)
+                )
+              ],
             ),
-            // Aquí van las fotos
             // Aquí van las fotos
             Container(
               height: 400,
@@ -111,6 +131,8 @@ class _eventoIndividualState extends State<eventoIndividual> {
                 future: Storage.obtenerFotos(widget.idEvento),
                 builder: (context, listaRegreso) {
                   if (listaRegreso.hasData) {
+                    final items = listaRegreso.data!.items;
+                    final filteredItems = filtrandoMisFotos ? items.where((item) => item.name.contains(widget.idUsuarioActual)).toList() : items;
                     // Si hay datos disponibles, muestra las fotos en un GridView
                     return GridView.builder(
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -118,9 +140,9 @@ class _eventoIndividualState extends State<eventoIndividual> {
                         crossAxisSpacing: 2.0,
                         mainAxisSpacing: 2.0,
                       ),
-                      itemCount: listaRegreso.data?.items.length,  //Numero de elementos en la cuadricula
+                      itemCount: filteredItems.length,  //Numero de elementos en la cuadricula
                       itemBuilder: (context, indice) {
-                        final nombreImagen = listaRegreso.data!.items[indice].name;
+                        final nombreImagen = filteredItems[indice].name;
                         return Padding(
                           padding: EdgeInsets.all(3),
                           child: FutureBuilder(
