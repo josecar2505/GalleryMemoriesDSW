@@ -889,6 +889,11 @@ class _inicioAppState extends State<inicioApp> {
                 if(uid == numUsuario.text){
                   amigoV = true;
                 }
+                setState(() {
+                  auxNickname = "";
+                  auxNombreU = "";
+                  auxCorreo = "";
+                });
 
                 setState(() {
                   auxNickname = "Nickname: ${jsonTemporal[0]['nickname']}";
@@ -923,6 +928,7 @@ class _inicioAppState extends State<inicioApp> {
               if(numUsuario.text.isEmpty){
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Para agregar un amigo es necesario ingresar el código de usuario")));
               }else{
+                List<dynamic> jsonTemporal = await DB.buscarUsuario(numUsuario.text);
                 bool invitadoAgregado = await DB.agregarAmigo(uid, numUsuario.text);
                 if(uid == numUsuario.text){
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("No puedes agregarte como amigo")));
@@ -930,7 +936,7 @@ class _inicioAppState extends State<inicioApp> {
                     _index = 4;
                   });
                 }else if (invitadoAgregado) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Usuario "+auxNickname+" agregado como amigo")));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Usuario ${jsonTemporal[0]['nickname']} agregado como amigo")));
                   setState(() {
                     _index = 4;
                   });
@@ -1006,6 +1012,7 @@ class _inicioAppState extends State<inicioApp> {
                                 TextButton(
                                   onPressed: () async {
                                     List<dynamic> amigos = await DB.Amigos(uid);
+                                    List<dynamic> jsonTemporal = await DB.buscarUsuario(numUsuario.text);
 
                                     if(!amigos.any((amigo) => amigo['amigos'] == numUsuario.text)){
                                       Navigator.of(context).pop();
@@ -1026,7 +1033,7 @@ class _inicioAppState extends State<inicioApp> {
                                       setState(() {
                                         _index = 4;
                                       });
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Usuario "+auxNickname+" eliminado de mi lista de amigos")));
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Usuario ${jsonTemporal[0]['nickname']} eliminado de mi lista de amigos")));
                                     }
                                     setState(() {
                                       numUsuario.text = "";
@@ -1089,7 +1096,7 @@ class _inicioAppState extends State<inicioApp> {
             Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => listaAmigos(idUsuario:uid)
+                    builder: (context) => listaAmigos(idUsuario:uid,nombre: nombre_usuario,nickname: abreviatura,)
                 ));
           },
           child: Text("CONSULTAR AMIGOS"),

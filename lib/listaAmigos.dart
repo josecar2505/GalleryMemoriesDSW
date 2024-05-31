@@ -1,9 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:gallery_memories/serviciosremotos.dart';
-class listaAmigos extends StatefulWidget {
-  final String idUsuario;
+import 'package:gallery_memories/chat.dart';
 
-  const listaAmigos({required this.idUsuario});
+class listaAmigos extends StatefulWidget {
+  final String idUsuario,nombre,nickname;
+
+  const listaAmigos({required this.idUsuario, required this.nombre, required this.nickname});
 
   @override
   State<listaAmigos> createState() => _listaAmigosState();
@@ -52,8 +55,74 @@ class _listaAmigosState extends State<listaAmigos> {
                     children: [
                       IconButton(
                         icon: Icon(Icons.chat_sharp, color: Colors.black87,),
-                        onPressed: () {
+                        onPressed: () async{
+                          bool chat1 = await DB.comprobarChat(widget.idUsuario,idUsuario);
+                          bool chat2 = await DB.comprobarChat(idUsuario,widget.idUsuario);
 
+                          if(chat1){
+                            String idChat = widget.idUsuario+idUsuario;
+                            String idPersona1 = widget.idUsuario;
+                            String idPersona2 = idUsuario;
+                            String nombre = widget.nombre;
+                            String nickname = widget.nickname;
+
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => chat(
+                                        idChat: idChat,
+                                        idPersona1: idPersona1,
+                                        idPersona2: idPersona2,
+                                        idUsuarioActual: idPersona1,
+                                        nombre: nombre,
+                                        nickname: nickname,),
+                                ));
+                          }else if(chat2){
+                            String idChat = idUsuario+widget.idUsuario;
+                            String idPersona2 = widget.idUsuario;
+                            String idPersona1 = idUsuario;
+                            String nombre = widget.nombre;
+                            String nickname = widget.nickname;
+
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => chat(
+                                      idChat: idChat,
+                                      idPersona1: idPersona1,
+                                      idPersona2: idPersona2,
+                                      idUsuarioActual: idPersona2,
+                                      nombre: nombre,
+                                      nickname: nickname,),
+                                ));
+                          }else{
+                            final mensajes = [];
+                            var chat1 = {
+                              'idPersona1' : widget.idUsuario,
+                              'idPersona2' : idUsuario,
+                              'chat' : mensajes,
+                            };
+
+                            await DB.crearChat(chat1,widget.idUsuario,idUsuario);
+
+                            String idChat = widget.idUsuario+idUsuario;
+                            String idPersona1 = widget.idUsuario;
+                            String idPersona2 = idUsuario;
+                            String nombre = widget.nombre;
+                            String nickname = widget.nickname;
+
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => chat(
+                                      idChat: idChat,
+                                      idPersona1: idPersona1,
+                                      idPersona2: idPersona2,
+                                      idUsuarioActual: idPersona1,
+                                      nombre: nombre,
+                                      nickname: nickname,),
+                                ));
+                          }
                         },
                       ),
                       IconButton(

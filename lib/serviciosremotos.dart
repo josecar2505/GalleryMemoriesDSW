@@ -818,6 +818,156 @@ class DB {
       return {};
     }
   }
+  // CHATS
+  static Future<bool> crearChat(Map<String, dynamic> chat,idPersona1,idPersona2) async {
+
+    // Crear una referencia al documento
+    DocumentReference chatRef =
+    baseremota.collection("chats").doc(idPersona1+idPersona2);
+
+    // Establecer los datos del usuario en el documento con el ID especificado
+    await chatRef.set(chat);
+
+    return true;
+  }
+
+  static Future<bool> comprobarChat(String idUsuario1, String idUsuario2) async {
+    try{
+      // Obtener la referencia al documento en la base de datos
+      var chatsDoc = baseremota.collection('chats').doc(idUsuario1+idUsuario2);
+
+      // Obtener los datos del documento
+      var chatsSnapshot = await chatsDoc.get();
+
+      // Verificar si el documento existe y contiene datos
+      if (chatsSnapshot.exists) {
+
+        return true;
+      }else{
+
+        return false;
+      }
+    }catch (e) {
+      // Manejar el error si ocurre al actualizar los datos en la base de datos
+      print('Error al crear el chat con el amigo: $e');
+      return false;
+    }
+  }
+
+  static Future<List<dynamic>> obtenerMensajes(String idChat) async {
+      try {
+        List<dynamic> mensajesList = [];
+        var chatDoc = baseremota.collection('chats').doc(idChat);
+        var chatSnapshot = await chatDoc.get();
+
+        if (chatSnapshot.exists) {
+          Map<String, dynamic>? chatData = chatSnapshot.data();
+
+          if (chatData != null){
+            mensajesList = chatData['chat'] ?? [];
+          }
+        }
+        return mensajesList;
+      } catch (e) {
+        print('Error al obtener  los mensajes: $e');
+        return [];
+      }
+  }
+
+  static Future<void> agregarMensaje(String idchat, String mensaje,usuario,nombre,nickname) async {
+    Map<String,dynamic> mensajes = {'comentario': mensaje,
+      'timestamp': DateTime.now(),
+      'usuario': usuario,
+      'nombre': nombre,
+      'nickname': nickname};
+
+    var chatDoc = baseremota.collection('chats').doc(idchat);
+
+    // Obtener los datos del documento
+    var chatSnapshot = await chatDoc.get();
+
+    // Verificar si el documento existe y contiene datos
+    if (chatSnapshot.exists) {
+      Map<String, dynamic>? chatData = chatSnapshot.data();
+
+      if (chatData != null){
+        List<dynamic> mensajesList = chatData['chat'] ?? [];
+
+        mensajesList.add(mensajes);
+
+        await FirebaseFirestore.instance
+            .collection('chats')
+            .doc(idchat).update({'chat': mensajesList});
+      }
+    }
+  }
+
+  static Future<void> eliminarMensaje(String idChat,Timestamp timestamp) async {
+    try {
+      var chatDoc = baseremota.collection('chats').doc(idChat);
+
+      // Obtener los datos del documento
+      var chatSnapshot = await chatDoc.get();
+
+      // Verificar si el documento existe y contiene datos
+      if (chatSnapshot.exists) {
+        Map<String, dynamic>? chatData = chatSnapshot.data();
+
+        if (chatData != null){
+          List<dynamic> mensajesList = chatData['chat'] ?? [];
+          for(var mensaje in mensajesList){
+            if(mensaje['timestamp'] == timestamp){
+              mensajesList.remove(mensaje);
+              break;
+            }
+          }
+          await FirebaseFirestore.instance
+              .collection('chats')
+              .doc(idChat).update({'chat': mensajesList});
+        }
+      }
+    } catch (e) {
+      print('Error al eliminar el mensaje: $e');
+    }
+  }
+
+  static Future<void> editarMensaje(String idChat,Timestamp timestamp,String nuevoMensaje) async {
+    try {
+      var chatDoc = baseremota.collection('chats').doc(idChat);
+
+      // Obtener los datos del documento
+      var chatSnapshot = await chatDoc.get();
+
+      // Verificar si el documento existe y contiene datos
+      if (chatSnapshot.exists) {
+        Map<String, dynamic>? chatData = chatSnapshot.data();
+
+        if (chatData != null){
+          List<dynamic> mensajesList = chatData['chat'] ?? [];
+          int index = 0;
+          for(var mensaje in mensajesList){
+            if(mensaje['timestamp'] == timestamp){
+              Map<String,dynamic> mensajes = {'comentario': nuevoMensaje,
+                'timestamp': mensaje['timestamp'],
+                'usuario': mensaje['usuario'],
+                'nombre': mensaje['nombre'],
+                'nickname': mensaje['nickname']};
+              mensajesList.remove(mensaje);
+              mensajesList.insert(index, mensajes);
+            }
+            index++;
+          }
+
+          await FirebaseFirestore.instance
+              .collection('chats')
+              .doc(idChat).update({'chat': mensajesList});
+        }
+      }
+    } catch (e) {
+      print('Error al editar el mensaje: $e');
+    }
+  }
+  //CHATS
 }
 
 class Storage {
