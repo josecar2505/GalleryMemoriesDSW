@@ -967,6 +967,120 @@ class DB {
       print('Error al editar el mensaje: $e');
     }
   }
+
+  static Future<Map<String, dynamic>> obtenerChats(String usuario) async {
+    try{
+      List<dynamic> amigosList = [];
+      // Obtener la referencia al documento del usuario en la base de datos
+      var usuarioDoc = baseremota.collection('usuarios').doc(usuario);
+
+      // Obtener los datos del documento
+      var usuarioSnapshot = await usuarioDoc.get();
+
+      // Verificar si el documento existe y contiene datos
+      if (usuarioSnapshot.exists) {
+
+        // Verificar si el documento existe antes de acceder a sus datos
+        Map<String, dynamic>? usuarioData = usuarioSnapshot.data();
+
+        if (usuarioData != null) {
+          amigosList = usuarioData['amigos'] ?? [];
+        }
+      }
+
+      DocumentSnapshot<Map<String, dynamic>> chatSnapshot;
+      Map<String, dynamic> chat = {
+        'chats': []
+      };
+
+      for(var amigo in amigosList){
+        chatSnapshot = await FirebaseFirestore.instance
+            .collection('chats')
+            .doc(usuario+amigo['amigos'])
+            .get();
+
+
+        if (chatSnapshot.exists) {
+          String idChat = chatSnapshot.data()?['idChat'];
+          String idPersona1 = chatSnapshot.data()?['idPersona1'];
+          String idPersona2 = chatSnapshot.data()?['idPersona2'];
+
+          DocumentSnapshot<Map<String, dynamic>> usuarioSnapshot =
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(idPersona2)
+              .get();
+
+          // Verificar si el documento existe y tiene datos
+          if (usuarioSnapshot.exists) {
+
+            String nickname = usuarioSnapshot.data()?['nickname'];
+            String nombre = usuarioSnapshot.data()?['nombre'];
+            String correo = usuarioSnapshot.data()?['email'];
+
+            (chat['chats'] as List).add({
+              'idChat': idChat,
+              'idPersona1': idPersona1,
+              'idPersona2': idPersona2,
+              'nickname': nickname,
+              'nombre': nombre,
+              'correo' : correo,
+            });
+          }
+        }
+
+        chatSnapshot = await FirebaseFirestore.instance
+            .collection('chats')
+            .doc(amigo['amigos']+usuario)
+            .get();
+
+        if (chatSnapshot.exists) {
+          String idChat = chatSnapshot.data()?['idChat'];
+          String idPersona1 = chatSnapshot.data()?['idPersona1'];
+          String idPersona2 = chatSnapshot.data()?['idPersona2'];
+
+          DocumentSnapshot<Map<String, dynamic>> usuarioSnapshot =
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(idPersona1)
+              .get();
+
+          // Verificar si el documento existe y tiene datos
+          if (usuarioSnapshot.exists) {
+
+            String nickname = usuarioSnapshot.data()?['nickname'];
+            String nombre = usuarioSnapshot.data()?['nombre'];
+            String correo = usuarioSnapshot.data()?['email'];
+
+            (chat['chats'] as List).add({
+              'idChat': idChat,
+              'idPersona1': idPersona1,
+              'idPersona2': idPersona2,
+              'nickname': nickname,
+              'nombre': nombre,
+              'correo' : correo,
+            });
+          }
+        }
+      }
+      print(chat);
+      return chat;
+    }catch (e) {
+      // Manejar el error si ocurre al actualizar los datos en la base de datos
+      print('Error al buscar chats del usuario: $e');
+      return {};
+    }
+  }
+
+  static Future<void> eliminarChat(String idChat) async {
+    try {
+
+      await baseremota.collection('chats').doc(idChat).delete();
+
+    } catch (e) {
+      print(e);
+    }
+  }
   //CHATS
 }
 

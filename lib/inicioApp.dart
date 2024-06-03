@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gallery_memories/listaInvitados.dart';
 import 'package:gallery_memories/listaAmigos.dart';
+import 'package:gallery_memories/listaChats.dart';
 import 'package:gallery_memories/login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:gallery_memories/serviciosremotos.dart';
@@ -1084,7 +1085,11 @@ class _inicioAppState extends State<inicioApp> {
             //BOTÓN PARA VER CHATS CON AMIGOS
             IconButton(
                 onPressed: (){
-
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => listaChats(idUsuario:uid,nombre: nombre_usuario,nickname: abreviatura,usuarioActual: uid,)
+                      ));
                 },
                 icon: Icon(Icons.chat, color: Colors.black87,)
             ),

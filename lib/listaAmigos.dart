@@ -101,6 +101,7 @@ class _listaAmigosState extends State<listaAmigos> {
                               'idPersona1' : widget.idUsuario,
                               'idPersona2' : idUsuario,
                               'chat' : mensajes,
+                              'idChat' : widget.idUsuario+idUsuario,
                             };
 
                             await DB.crearChat(chat1,widget.idUsuario,idUsuario);
@@ -205,11 +206,9 @@ class _listaAmigosState extends State<listaAmigos> {
 
     amigos = await DB.Amigos(widget.idUsuario);
 
-    print(amigos);
     for(var usuario in amigos){
       datosamigos.add(await DB.obtenerDatosUsuario(usuario['amigos']));
     }
-    print(datosamigos);
     setState(() {
       _DatosAmigos = datosamigos.cast<Map<String, dynamic>>();
       _isLoading = false;

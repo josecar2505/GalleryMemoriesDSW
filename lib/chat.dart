@@ -17,10 +17,11 @@ class _chatState extends State<chat> {
   bool _isLoading = true;
   bool _filtrarMisMensajes = false;
   bool _filtrarSoloMisMensajes = false;
-
+  late Stream<QuerySnapshot> _mensajesStream;
   @override
   void initState() {
     super.initState();
+    _mensajesStream = FirebaseFirestore.instance.collection('chats').doc(widget.idChat).collection('chat').snapshots();
     _cargarMensajes();
   }
 
@@ -63,7 +64,7 @@ class _chatState extends State<chat> {
                 ? Center(child: Text('Aun no hay mensajes en el chat'))
                 : ListView.builder(
               itemCount: _mensajes.length,
-              itemBuilder: (context, index) {
+              itemBuilder: (context,index) {
                 var mensajes = _mensajes[index];
                 bool esMio = false;
                 if(mensajes['usuario'] == widget.idUsuarioActual){
