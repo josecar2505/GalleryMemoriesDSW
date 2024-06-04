@@ -21,7 +21,7 @@ class DB {
 
     return temporal;
   }
-
+  //CRUD USUARIO
   static Future<String> creaUsuario(Map<String, dynamic> usuario) async {
     String idUsuario = usuario['idUsuario']; // Obtener el ID del usuario
 
@@ -38,18 +38,41 @@ class DB {
 
   static Future<void> eliminaUsuario(String uid) async {
     try {
-      //1. Borrar todos los eventos creados por el usuario
-      var eventosCreados = await baseremota
-          .collection('eventos')
-          .where('propietario', isEqualTo: uid)
-          .get();
+      // 1. Borrar todos los eventos creados por el usuario
+      var eventosCreados = await baseremota.collection('eventos').where('propietario', isEqualTo: uid).get();
       for (var doc in eventosCreados.docs) {
+        //Borrar las imagenes y la carpeta de imágenes de ese evento
+        await Storage.eliminarCarpeta(doc.id);
+        //Eliminar evento de la tabla eventos
         await baseremota.collection('eventos').doc(doc.id).delete();
       }
+      
+      // 2. Borrar los chats que tenga ese usuario
+       var chatsAbiertos = await baseremota.collection('chats').where('idChat',arrayContains: uid).get();
+      
+      for(var doc in chatsAbiertos.docs){
+        await baseremota.collection('chats').doc(doc.id).delete();
+      }
+      
+      // 3. Borrarme de la lista de invitados de los usuarios
+      var usuariosAmigos = await baseremota.collection('usuarios').where('amigos', arrayContains: uid).get();
 
-      // 2. Borrarse como invitado de todos los eventos en los que se encuentre
-      var eventosInvitadoSnapshot =
-          await baseremota.collection('eventos').get();
+      for (var usuarioSnapshot in usuariosAmigos.docs) {
+        var usuarioData = usuarioSnapshot.data();
+        List<dynamic> amigos = usuarioData['amigos'] ?? [];
+
+        // Remover al usuario de la lista de amigos
+        amigos.remove(uid);
+
+        // Actualizar la lista de amigos del usuario solo si se hizo una modificación
+        if (amigos.length != usuarioData['amigos'].length) {
+          await usuarioSnapshot.reference.update({'amigos': amigos});
+          print("Usuario eliminado de la lista de amigos de ${usuarioSnapshot.id}");
+        }
+      }
+
+      // 4. Borrarse como invitado de todos los eventos en los que se encuentre
+      var eventosInvitadoSnapshot = await baseremota.collection('eventos').get();
       for (var doc in eventosInvitadoSnapshot.docs) {
         var datosEvento = doc.data() as Map<String, dynamic>;
         List<dynamic> invitados = datosEvento['invitados'] ?? [];
@@ -62,29 +85,44 @@ class DB {
 
         // Actualizar la lista de invitados solo si se hizo una modificación
         if (invitados.length != datosOriginales) {
-          await baseremota
-              .collection('eventos')
-              .doc(doc.id)
-              .update({'invitados': invitados});
+          await baseremota.collection('eventos').doc(doc.id).update({'invitados': invitados});
           print("Actualización realizada en el evento: ${doc.id}");
         }
       }
 
-      //3. Eliminar información del usuario (tabla usuarios)
+      // 5. Eliminar información del usuario (tabla usuarios)
       await baseremota.collection('usuarios').doc(uid).delete();
+
     } catch (e) {
       print('Error al eliminar el usuario: $e');
     }
   }
 
-  static Future<void> eliminarEvento(String idEvento) async {
+  static Future<void> actualizarDatosUsuario(String uid, String nuevoNombre, String nuevoNickname) async {
     try {
-      await baseremota.collection('eventos').doc(idEvento).delete();
+      var query = await baseremota
+          .collection("usuarios")
+          .where('idUsuario', isEqualTo: uid)
+          .get();
+      if (query.docs.isNotEmpty) {
+        // Obtener el ID del primer documento que cumple con la consulta
+        var idDocumento = query.docs.first.id;
+        await baseremota.collection("usuarios").doc(idDocumento).update({
+          'nombre': nuevoNombre,
+          'nickname': nuevoNickname,
+        });
+        print("No hay al encontrar el documento del usuario $uid");
+      } else {
+        print("Error al encontrar el documento del usuario $uid");
+        return null;
+      }
     } catch (e) {
-      print("Error al eliminar el evento: $e");
+      print("Error al obtener el ID del documento: $e");
+      return null;
     }
   }
 
+  //CRUD EVENTO
   static creaEvento(Map<String, dynamic> evento) async {
     DocumentReference eventoRef =
         await baseremota.collection("eventos").add(evento);
@@ -121,6 +159,170 @@ class DB {
     return temp;
   }
 
+  static Future<void> eliminarEvento(String idEvento) async {
+    try {
+      await baseremota.collection('eventos').doc(idEvento).delete();
+    } catch (e) {
+      print("Error al eliminar el evento: $e");
+    }
+  }
+
+  static Future<Map<String, dynamic>> obtenerDatosEvento(String idEvento) async {
+    try {
+      // Obtener el documento del evento desde Firebase usando el ID del evento
+      var documentoEvento =
+      await baseremota.collection("eventos").doc(idEvento).get();
+      if (documentoEvento.exists) {
+        // Extraer los datos del documento del evento
+        Map<String, dynamic> datosEvento =
+        documentoEvento.data() as Map<String, dynamic>;
+
+        // Obtener el nombre del propietario del evento
+        var documentoUsuario = await baseremota
+            .collection("usuarios")
+            .doc(datosEvento['propietario'])
+            .get();
+        if (documentoUsuario.exists) {
+          var nombrePropietario = documentoUsuario.data()?['nombre'];
+          datosEvento['propietario'] = nombrePropietario;
+        } else {
+          print(
+              "No se encontró ningún documento de usuario con el ID ${datosEvento['propietario']}");
+        }
+
+        // Si es necesario, puedes hacer ajustes adicionales aquí antes de devolver los datos del evento
+
+        return datosEvento;
+      } else {
+        // El evento no fue encontrado en Firebase
+        throw Exception(
+            "El evento con el ID $idEvento no fue encontrado en Firebase.");
+      }
+    } catch (error) {
+      // Manejar cualquier error que ocurra durante la obtención de los datos del evento
+      throw Exception("Error al obtener los datos del evento: $error");
+    }
+  }
+
+  static Future<void> actualizarEvento(eventoId, String nombre, String tipo, String fecha, String hora) async {
+    try {
+      var query = await baseremota.collection("eventos").doc(eventoId).get();
+
+      if (query.exists) {
+        // Actualizar los datos del evento
+        await baseremota.collection("eventos").doc(eventoId).update({
+          'nombre': nombre,
+          'tipoEvento': tipo,
+          'fechaEvento': fecha,
+          'horaEvento': hora
+        });
+        print("Evento actualizado correctamente.");
+      } else {
+        print("No se encontró ningún evento con el ID $eventoId.");
+      }
+    } catch (e) {
+      print("Error al actualizar el evento: $e");
+    }
+  }
+
+  static Future cambiarEstado(String id) async {
+    try {
+      // Referencia al documento en la colección "eventos"
+      var referenciaEvento =
+      await baseremota.collection("eventos").doc(id).get();
+
+      if (referenciaEvento.exists) {
+        // Verificar si el documento existe antes de acceder a sus datos
+        Map<String, dynamic>? mapa = referenciaEvento.data();
+
+        if (mapa != null && mapa.isNotEmpty) {
+          // Cambiar el valor del campo "estatus" a false
+          var valor = !mapa['estatus'];
+          baseremota.collection("eventos").doc(id).update({'estatus': valor});
+        } else {
+          print("El documento está vacío o no contiene datos.");
+        }
+      } else {
+        print("El documento con ID $id no existe.");
+      }
+
+      print("Evento cerrado con éxito. Campo 'estatus' cambiado a false.");
+    } catch (e) {
+      // Manejar el error según sea necesario
+      print("Error al cerrar el evento: $e");
+    }
+  }
+
+  static Future<bool?> obtenerEstado(String id) async {
+    try {
+      // Referencia al documento en la colección "eventos"
+      var referenciaEvento =
+      await baseremota.collection("eventos").doc(id).get();
+
+      if (referenciaEvento.exists) {
+        // Verificar si el documento existe antes de acceder a sus datos
+        Map<String, dynamic>? mapa = referenciaEvento.data();
+
+        if (mapa != null && mapa.isNotEmpty && mapa.containsKey('estatus')) {
+          // Obtener el valor actual del campo "estatus"
+          var estado = mapa['estatus'];
+          return estado;
+        } else {
+          print(
+              "El documento está vacío, no contiene datos o no tiene el campo 'estatus'.");
+          return null; // Indica que no se pudo obtener el estado
+        }
+      } else {
+        print("El documento con ID $id no existe.");
+        return null; // Indica que no se pudo obtener el estado
+      }
+    } catch (e) {
+      // Manejar el error según sea necesario
+      print("Error al obtener el estado del evento: $e");
+      return null; // Indica que no se pudo obtener el estado
+    }
+  }
+
+  static Future<void> actualizarAccesoInvitado(String idEvento, String idInvitado, bool nuevoAcceso) async {
+    try {
+      // Obtener la referencia al documento del evento en la base de datos
+      var eventoDoc = baseremota.collection('eventos').doc(idEvento);
+
+      // Obtener los datos del documento
+      var eventoSnapshot = await eventoDoc.get();
+
+      // Verificar si el documento existe y contiene datos
+      if (eventoSnapshot.exists) {
+        // Obtener el arreglo de invitados del documento
+        List<dynamic> invitadosList = eventoSnapshot.data()?['invitados'];
+
+        // Buscar el invitado por su ID
+        for (var invitado in invitadosList) {
+          if (invitado['idInvitado'] == idInvitado) {
+            // Actualizar el acceso del invitado
+            invitado['acceso'] = nuevoAcceso;
+
+            // Guardar los cambios en Firestore
+            await eventoDoc.update({'invitados': invitadosList});
+
+            print('Acceso actualizado para el invitado con ID: $idInvitado');
+            return;
+          }
+        }
+
+        // Si no se encontró el invitado
+        print('No se encontró el invitado con ID: $idInvitado');
+      } else {
+        print('El documento del evento no existe');
+      }
+    } catch (e) {
+      // Manejar el error si ocurre al actualizar los datos en la base de datos
+      print('Error al actualizar el acceso del invitado: $e');
+      throw e;
+    }
+  }
+
+  //CRUD REFERENTE A LOS INVITADOS O INVITACIONES
   static Future<List> buscarInvitacion(String idinvitacion) async {
     List temp = [];
 
@@ -284,146 +486,6 @@ class DB {
     }
   }
 
-  static Future<Map<String, dynamic>> obtenerDatosEvento(String idEvento) async {
-    try {
-      // Obtener el documento del evento desde Firebase usando el ID del evento
-      var documentoEvento =
-          await baseremota.collection("eventos").doc(idEvento).get();
-      if (documentoEvento.exists) {
-        // Extraer los datos del documento del evento
-        Map<String, dynamic> datosEvento =
-            documentoEvento.data() as Map<String, dynamic>;
-
-        // Obtener el nombre del propietario del evento
-        var documentoUsuario = await baseremota
-            .collection("usuarios")
-            .doc(datosEvento['propietario'])
-            .get();
-        if (documentoUsuario.exists) {
-          var nombrePropietario = documentoUsuario.data()?['nombre'];
-          datosEvento['propietario'] = nombrePropietario;
-        } else {
-          print(
-              "No se encontró ningún documento de usuario con el ID ${datosEvento['propietario']}");
-        }
-
-        // Si es necesario, puedes hacer ajustes adicionales aquí antes de devolver los datos del evento
-
-        return datosEvento;
-      } else {
-        // El evento no fue encontrado en Firebase
-        throw Exception(
-            "El evento con el ID $idEvento no fue encontrado en Firebase.");
-      }
-    } catch (error) {
-      // Manejar cualquier error que ocurra durante la obtención de los datos del evento
-      throw Exception("Error al obtener los datos del evento: $error");
-    }
-  }
-
-  static Future cambiarEstado(String id) async {
-    try {
-      // Referencia al documento en la colección "eventos"
-      var referenciaEvento =
-          await baseremota.collection("eventos").doc(id).get();
-
-      if (referenciaEvento.exists) {
-        // Verificar si el documento existe antes de acceder a sus datos
-        Map<String, dynamic>? mapa = referenciaEvento.data();
-
-        if (mapa != null && mapa.isNotEmpty) {
-          // Cambiar el valor del campo "estatus" a false
-          var valor = !mapa['estatus'];
-          baseremota.collection("eventos").doc(id).update({'estatus': valor});
-        } else {
-          print("El documento está vacío o no contiene datos.");
-        }
-      } else {
-        print("El documento con ID $id no existe.");
-      }
-
-      print("Evento cerrado con éxito. Campo 'estatus' cambiado a false.");
-    } catch (e) {
-      // Manejar el error según sea necesario
-      print("Error al cerrar el evento: $e");
-    }
-  }
-
-  static Future<bool?> obtenerEstado(String id) async {
-    try {
-      // Referencia al documento en la colección "eventos"
-      var referenciaEvento =
-          await baseremota.collection("eventos").doc(id).get();
-
-      if (referenciaEvento.exists) {
-        // Verificar si el documento existe antes de acceder a sus datos
-        Map<String, dynamic>? mapa = referenciaEvento.data();
-
-        if (mapa != null && mapa.isNotEmpty && mapa.containsKey('estatus')) {
-          // Obtener el valor actual del campo "estatus"
-          var estado = mapa['estatus'];
-          return estado;
-        } else {
-          print(
-              "El documento está vacío, no contiene datos o no tiene el campo 'estatus'.");
-          return null; // Indica que no se pudo obtener el estado
-        }
-      } else {
-        print("El documento con ID $id no existe.");
-        return null; // Indica que no se pudo obtener el estado
-      }
-    } catch (e) {
-      // Manejar el error según sea necesario
-      print("Error al obtener el estado del evento: $e");
-      return null; // Indica que no se pudo obtener el estado
-    }
-  }
-
-  static Future<void> actualizarDatosUsuario(String uid, String nuevoNombre, String nuevoNickname) async {
-    try {
-      var query = await baseremota
-          .collection("usuarios")
-          .where('idUsuario', isEqualTo: uid)
-          .get();
-      if (query.docs.isNotEmpty) {
-        // Obtener el ID del primer documento que cumple con la consulta
-        var idDocumento = query.docs.first.id;
-        await baseremota.collection("usuarios").doc(idDocumento).update({
-          'nombre': nuevoNombre,
-          'nickname': nuevoNickname,
-        });
-        print("No hay al encontrar el documento del usuario $uid");
-      } else {
-        print("Error al encontrar el documento del usuario $uid");
-        return null;
-      }
-    } catch (e) {
-      print("Error al obtener el ID del documento: $e");
-      return null;
-    }
-  }
-
-  static Future<void> actualizarEvento(eventoId, String nombre, String tipo, String fecha, String hora) async {
-    try {
-      var query = await baseremota.collection("eventos").doc(eventoId).get();
-
-      if (query.exists) {
-        // Actualizar los datos del evento
-        await baseremota.collection("eventos").doc(eventoId).update({
-          'nombre': nombre,
-          'tipoEvento': tipo,
-          'fechaEvento': fecha,
-          'horaEvento': hora
-        });
-        print("Evento actualizado correctamente.");
-      } else {
-        print("No se encontró ningún evento con el ID $eventoId.");
-      }
-    } catch (e) {
-      print("Error al actualizar el evento: $e");
-    }
-  }
-
   static Future<List<dynamic>> obtenerListaInvitados(String idEvento) async {
     try {
       // Obtener la referencia al documento de invitados en Firebase
@@ -482,44 +544,7 @@ class DB {
     }
   }
 
-  static Future<void> actualizarAccesoInvitado(String idEvento, String idInvitado, bool nuevoAcceso) async {
-    try {
-      // Obtener la referencia al documento del evento en la base de datos
-      var eventoDoc = baseremota.collection('eventos').doc(idEvento);
 
-      // Obtener los datos del documento
-      var eventoSnapshot = await eventoDoc.get();
-
-      // Verificar si el documento existe y contiene datos
-      if (eventoSnapshot.exists) {
-        // Obtener el arreglo de invitados del documento
-        List<dynamic> invitadosList = eventoSnapshot.data()?['invitados'];
-
-        // Buscar el invitado por su ID
-        for (var invitado in invitadosList) {
-          if (invitado['idInvitado'] == idInvitado) {
-            // Actualizar el acceso del invitado
-            invitado['acceso'] = nuevoAcceso;
-
-            // Guardar los cambios en Firestore
-            await eventoDoc.update({'invitados': invitadosList});
-
-            print('Acceso actualizado para el invitado con ID: $idInvitado');
-            return;
-          }
-        }
-
-        // Si no se encontró el invitado
-        print('No se encontró el invitado con ID: $idInvitado');
-      } else {
-        print('El documento del evento no existe');
-      }
-    } catch (e) {
-      // Manejar el error si ocurre al actualizar los datos en la base de datos
-      print('Error al actualizar el acceso del invitado: $e');
-      throw e;
-    }
-  }
   //CRUD COMENTARIOS
   static Future<List<Map<String, dynamic>>> obtenerComentarios(String idEvento, String nombreImagen) async {
     var snapshot = await FirebaseFirestore.instance
@@ -601,7 +626,7 @@ class DB {
     return query.docs.isNotEmpty;
   }
 
-  // Jesus Sobre los Amigos
+  // CRUD AMIGOS
   static Future<bool> agregarAmigo(String idUsuario, String idInvitado) async {
     try{
       if(idUsuario == idInvitado){
@@ -1074,14 +1099,11 @@ class DB {
 
   static Future<void> eliminarChat(String idChat) async {
     try {
-
       await baseremota.collection('chats').doc(idChat).delete();
-
     } catch (e) {
       print(e);
     }
   }
-  //CHATS
 }
 
 class Storage {
@@ -1143,7 +1165,6 @@ class Storage {
       return await carpetaRemota.ref("$nombreCarpeta/$nombre").getDownloadURL();
     } catch (error) {
       print('Error al obtener la URL de descarga de la imagen: $error');
-      // Si se produce un error, puedes devolver una URL predeterminada o null según tu caso
       return null;
     }
   }
@@ -1153,6 +1174,29 @@ class Storage {
     return await carpetaRemota.ref(carpeta).listAll();
   }
 
+  static Future<void> eliminarCarpeta(String nombreCarpeta) async {
+    try {
+      // Obtén la referencia a la carpeta
+      final carpetaRef = carpetaRemota.ref().child(nombreCarpeta);
+
+      // Obtén todos los archivos en la carpeta
+      final ListResult result = await carpetaRef.listAll();
+
+      // Elimina cada archivo individualmente
+      for (var item in result.items) {
+        await item.delete();
+      }
+
+      // Si la carpeta tiene subcarpetas, también elimina su contenido
+      for (var prefix in result.prefixes) {
+        await eliminarCarpeta(prefix.fullPath);
+      }
+      print("Carpeta eliminada exitosamente");
+    } catch (error) {
+      print("Error al eliminar la carpeta: $error");
+    }
+  }
+
   static Future<void> eliminarImagen(String nombreCarpeta, String nombreImagen) async {
     try {
       // Obtener la referencia del archivo a eliminar
@@ -1160,11 +1204,9 @@ class Storage {
 
       // Eliminar el archivo
       await referenciaArchivo.delete();
-
       print("Imagen eliminada correctamente.");
     } catch (error) {
       print("Error al eliminar la imagen: $error");
-      // Puedes manejar el error de acuerdo a tus necesidades
     }
   }
 }

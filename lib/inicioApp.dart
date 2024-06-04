@@ -360,10 +360,21 @@ class _inicioAppState extends State<inicioApp> {
                                                         actions: [
                                                           TextButton(
                                                             onPressed: () {
+                                                              // Guarda el contexto actual para su uso posterior
+                                                              BuildContext currentContext = context;
+
+                                                              // Elimina el evento y muestra el SnackBar después de la operación
                                                               DB.eliminarEvento(listaJSON.data?[indice]['id']).then((value) {
-                                                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Evento ${listaJSON.data?[indice]['nombre']} borrado con éxito.")));
+                                                                // Muestra el SnackBar usando el contexto guardado
+                                                                ScaffoldMessenger.of(currentContext).showSnackBar(SnackBar(content: Text("Evento ${listaJSON.data?[indice]['nombre']} borrado con éxito."),));
                                                               });
+
+                                                              // Borra la carpeta de imágenes
+                                                              Storage.eliminarCarpeta(listaJSON.data?[indice]['id']);
+
+                                                              // Actualiza el estado
                                                               setState(() {});
+                                                              // Cierra el diálogo
                                                               Navigator.of(context).pop();
                                                             },
                                                             child: Text("Aceptar"),
